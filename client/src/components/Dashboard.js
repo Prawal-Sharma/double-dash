@@ -121,44 +121,49 @@ const Dashboard = () => {
       </div>
 
       <h2>Activities</h2>
-      {activities.map((activity) => (
-        <div
-          key={activity.id}
-          style={{
-            border: '1px solid #ccc',
-            borderRadius: '10px',
-            padding: '20px',
-            marginBottom: '20px',
-          }}
-        >
-          <h3>{activity.name}</h3>
-          <p><strong>Date:</strong> {new Date(activity.start_date).toLocaleString()}</p>
-          <p><strong>Type:</strong> {activity.type}</p>
-          <p><strong>Distance:</strong> {(activity.distance / 1000).toFixed(2)} km</p>
-          <p><strong>Moving Time:</strong> {(activity.moving_time / 60).toFixed(2)} minutes</p>
-          <p><strong>Elevation Gain:</strong> {activity.total_elevation_gain} meters</p>
-          <p><strong>Average Speed:</strong> {(activity.average_speed * 3.6).toFixed(2)} km/h</p>
-          <p><strong>Max Speed:</strong> {(activity.max_speed * 3.6).toFixed(2)} km/h</p>
-          {activity.average_heartrate && (
-            <p><strong>Average Heartrate:</strong> {activity.average_heartrate} bpm</p>
-          )}
-          {activity.max_heartrate && (
-            <p><strong>Max Heartrate:</strong> {activity.max_heartrate} bpm</p>
-          )}
-          {activity.suffer_score && (
-            <p><strong>Suffer Score:</strong> {activity.suffer_score}</p>
-          )}
-          {activity.kudos_count !== undefined && (
-            <p><strong>Kudos:</strong> {activity.kudos_count}</p>
-          )}
-          {activity.achievement_count !== undefined && (
-            <p><strong>Achievements:</strong> {activity.achievement_count}</p>
-          )}
-          {activity.description && (
-            <p><strong>Description:</strong> {activity.description}</p>
-          )}
-        </div>
-      ))}
+{activities.map((activity) => (
+  <div
+    key={activity.id}
+    style={{
+      border: '1px solid #ccc',
+      borderRadius: '10px',
+      padding: '20px',
+      marginBottom: '20px',
+    }}
+  >
+    <h3>{activity.name}</h3>
+    <p><strong>Date:</strong> {new Date(activity.start_date).toLocaleString()}</p>
+    <p><strong>Type:</strong> {activity.type}</p>
+    <p><strong>Sport Type:</strong> {activity.sport_type}</p>
+    <p><strong>Distance:</strong> {(activity.distance / 1000).toFixed(2)} km</p>
+    <p><strong>Moving Time:</strong> {(activity.moving_time / 60).toFixed(2)} minutes</p>
+    <p><strong>Elapsed Time:</strong> {(activity.elapsed_time / 60).toFixed(2)} minutes</p>
+    <p><strong>Elevation Gain:</strong> {activity.total_elevation_gain} meters</p>
+    <p><strong>Average Speed:</strong> {(activity.average_speed * 3.6).toFixed(2)} km/h</p>
+    <p><strong>Max Speed:</strong> {(activity.max_speed * 3.6).toFixed(2)} km/h</p>
+    <p><strong>Average Cadence:</strong> {activity.average_cadence} rpm</p>
+    <p><strong>Average Watts:</strong> {activity.average_watts} W</p>
+    <p><strong>Weighted Average Watts:</strong> {activity.weighted_average_watts} W</p>
+    <p><strong>Kilojoules:</strong> {activity.kilojoules} kJ</p>
+    <p><strong>Average Heartrate:</strong> {activity.average_heartrate} bpm</p>
+    <p><strong>Max Heartrate:</strong> {activity.max_heartrate} bpm</p>
+    <p><strong>Max Watts:</strong> {activity.max_watts} W</p>
+    <p><strong>Suffer Score:</strong> {activity.suffer_score}</p>
+    <p><strong>Kudos:</strong> {activity.kudos_count}</p>
+    <p><strong>Comments:</strong> {activity.comment_count}</p>
+    <p><strong>Photos:</strong> {activity.total_photo_count}</p>
+    <p><strong>Location Country:</strong> {activity.location_country}</p>
+    <p><strong>Trainer:</strong> {activity.trainer ? 'Yes' : 'No'}</p>
+    <p><strong>Commute:</strong> {activity.commute ? 'Yes' : 'No'}</p>
+    <p><strong>Manual:</strong> {activity.manual ? 'Yes' : 'No'}</p>
+    <p><strong>Private:</strong> {activity.private ? 'Yes' : 'No'}</p>
+    <p><strong>Flagged:</strong> {activity.flagged ? 'Yes' : 'No'}</p>
+    <p><strong>Gear ID:</strong> {activity.gear_id}</p>
+    {activity.description && (
+      <p><strong>Description:</strong> {activity.description}</p>
+    )}
+  </div>
+))}
     </div>
   );
 };
