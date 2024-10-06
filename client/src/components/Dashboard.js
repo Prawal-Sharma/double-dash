@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
   const [activities, setActivities] = useState([]);
+  const [summary, setSummary] = useState({});
   const [error, setError] = useState(null);
 
   const code = searchParams.get('code');
@@ -24,17 +25,63 @@ const Dashboard = () => {
 
         const accessToken = tokenResponse.data.access_token;
 
-        // Fetch athlete activities
-        const activitiesResponse = await axios.get(
-          'https://www.strava.com/api/v3/athlete/activities',
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
+        let page = 1;
+        let allActivities = [];
+        let fetchMore = true;
+
+        // Fetch activities from all pages
+        while (fetchMore) {
+          const activitiesResponse = await axios.get(
+            'https://www.strava.com/api/v3/athlete/activities',
+            {
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+              },
+              params: {
+                per_page: 200,
+                page: page,
+              },
+            }
+          );
+
+          if (activitiesResponse.data.length > 0) {
+            allActivities = allActivities.concat(activitiesResponse.data);
+            page++;
+          } else {
+            fetchMore = false;
           }
+        }
+
+        setActivities(allActivities);
+
+        // Calculate summary statistics
+        const totalDistance = allActivities.reduce((sum, activity) => sum + activity.distance, 0);
+        const totalElevation = allActivities.reduce(
+          (sum, activity) => sum + activity.total_elevation_gain,
+          0
+        );
+        const totalMovingTime = allActivities.reduce(
+          (sum, activity) => sum + activity.moving_time,
+          0
         );
 
-        setActivities(activitiesResponse.data);
+        const activityTypes = {};
+        allActivities.forEach((activity) => {
+          const type = activity.type;
+          if (activityTypes[type]) {
+            activityTypes[type]++;
+          } else {
+            activityTypes[type] = 1;
+          }
+        });
+
+        setSummary({
+          totalActivities: allActivities.length,
+          totalDistance,
+          totalElevation,
+          totalMovingTime,
+          activityTypes,
+        });
       } catch (err) {
         setError(err.message);
       }
@@ -50,19 +97,68 @@ const Dashboard = () => {
   }
 
   if (!activities.length) {
-    return <div>Loading activities...</div>;
+    return <div>Loading data...</div>;
   }
 
   return (
-    <div>
-      <h1>Your Activities</h1>
-      <ul>
-        {activities.map((activity) => (
-          <li key={activity.id}>
-            {activity.name} - {activity.distance} meters
-          </li>
-        ))}
-      </ul>
+    <div style={{ padding: '20px', fontFamily: '"Segoe UI", Tahoma, Geneva, Verdana, sans-serif' }}>
+      <h1>Your Strava Activities Dashboard</h1>
+
+      <div style={{ marginBottom: '40px' }}>
+        <h2>Summary</h2>
+        <p><strong>Total Activities:</strong> {summary.totalActivities}</p>
+        <p><strong>Total Distance:</strong> {(summary.totalDistance / 1000).toFixed(2)} km</p>
+        <p><strong>Total Elevation Gain:</strong> {summary.totalElevation} meters</p>
+        <p><strong>Total Moving Time:</strong> {(summary.totalMovingTime / 3600).toFixed(2)} hours</p>
+        <h3>Activities by Type:</h3>
+        <ul>
+          {Object.keys(summary.activityTypes).map((type) => (
+            <li key={type}>
+              {type}: {summary.activityTypes[type]}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <h2>Activities</h2>
+      {activities.map((activity) => (
+        <div
+          key={activity.id}
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: '10px',
+            padding: '20px',
+            marginBottom: '20px',
+          }}
+        >
+          <h3>{activity.name}</h3>
+          <p><strong>Date:</strong> {new Date(activity.start_date).toLocaleString()}</p>
+          <p><strong>Type:</strong> {activity.type}</p>
+          <p><strong>Distance:</strong> {(activity.distance / 1000).toFixed(2)} km</p>
+          <p><strong>Moving Time:</strong> {(activity.moving_time / 60).toFixed(2)} minutes</p>
+          <p><strong>Elevation Gain:</strong> {activity.total_elevation_gain} meters</p>
+          <p><strong>Average Speed:</strong> {(activity.average_speed * 3.6).toFixed(2)} km/h</p>
+          <p><strong>Max Speed:</strong> {(activity.max_speed * 3.6).toFixed(2)} km/h</p>
+          {activity.average_heartrate && (
+            <p><strong>Average Heartrate:</strong> {activity.average_heartrate} bpm</p>
+          )}
+          {activity.max_heartrate && (
+            <p><strong>Max Heartrate:</strong> {activity.max_heartrate} bpm</p>
+          )}
+          {activity.suffer_score && (
+            <p><strong>Suffer Score:</strong> {activity.suffer_score}</p>
+          )}
+          {activity.kudos_count !== undefined && (
+            <p><strong>Kudos:</strong> {activity.kudos_count}</p>
+          )}
+          {activity.achievement_count !== undefined && (
+            <p><strong>Achievements:</strong> {activity.achievement_count}</p>
+          )}
+          {activity.description && (
+            <p><strong>Description:</strong> {activity.description}</p>
+          )}
+        </div>
+      ))}
     </div>
   );
 };
