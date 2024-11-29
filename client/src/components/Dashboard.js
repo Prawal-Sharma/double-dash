@@ -9,6 +9,7 @@ const Dashboard = () => {
   const [error, setError] = useState(null);
 
   const code = searchParams.get('code');
+  console.log('Authorization Code:', code);
   const clientID = '136786';
   const clientSecret = '1e6da8d0da5464c513c0625fda9f27ce44b32ea1';
 
@@ -22,6 +23,8 @@ const Dashboard = () => {
           code: code,
           grant_type: 'authorization_code',
         });
+
+        console.log("This is the token response", tokenResponse);
 
         const accessToken = tokenResponse.data.access_token;
 
@@ -53,6 +56,7 @@ const Dashboard = () => {
         }
 
         setActivities(allActivities);
+        console.log("This is all gathered activities", allActivities);
 
         // Calculate summary statistics
         const totalDistance = allActivities.reduce((sum, activity) => sum + activity.distance, 0);
@@ -90,7 +94,7 @@ const Dashboard = () => {
     if (code) {
       fetchData();
     }
-  }, [code, clientID, clientSecret]);
+  }, [code]);
 
   if (error) {
     return <div>Error: {error}</div>;
