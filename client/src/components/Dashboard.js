@@ -26,7 +26,16 @@ const Dashboard = () => {
 
         console.log("This is the token response", tokenResponse);
 
+        console.log('Token Response Data:', tokenResponse.data);
+        console.log('Access Token:', tokenResponse.data.access_token);
+        console.log('Refresh Token:', tokenResponse.data.refresh_token);
+        console.log('Expires At:', tokenResponse.data.expires_at);
+        console.log('Expires In:', tokenResponse.data.expires_in);
+        
+
         const accessToken = tokenResponse.data.access_token;
+
+        console.log("This is the accessToken", accessToken);
 
         let page = 1;
         let allActivities = [];
@@ -47,6 +56,8 @@ const Dashboard = () => {
             }
           );
 
+          console.log("Fetching dat in a loop, this is the activitiesResponse", activitiesResponse);
+
           if (activitiesResponse.data.length > 0) {
             allActivities = allActivities.concat(activitiesResponse.data);
             page++;
@@ -54,6 +65,8 @@ const Dashboard = () => {
             fetchMore = false;
           }
         }
+
+        console.log("Page number", page);
 
         setActivities(allActivities);
         console.log("This is all gathered activities", allActivities);
@@ -87,16 +100,19 @@ const Dashboard = () => {
           activityTypes,
         });
       } catch (err) {
+        console.log("We are catching this error", err);
         setError(err.message);
       }
     };
 
     if (code) {
+      console.log("About to fetchData");
       fetchData();
     }
   }, [code]);
 
   if (error) {
+    console.log("We have an error", error); 
     return <div>Error: {error}</div>;
   }
 
