@@ -56,7 +56,7 @@ const Dashboard = () => {
             }
           );
 
-          console.log("Fetching dat in a loop, this is the activitiesResponse", activitiesResponse);
+          console.log("Fetching data in a loop, this is the activitiesResponse", activitiesResponse);
 
           if (activitiesResponse.data.length > 0) {
             allActivities = allActivities.concat(activitiesResponse.data);
@@ -67,9 +67,11 @@ const Dashboard = () => {
         }
 
         console.log("Page number", page);
+        const runActivities = allActivities.filter(activity => activity.type === 'Run');
+        setActivities(runActivities);
 
-        setActivities(allActivities);
-        console.log("This is all gathered activities", allActivities);
+        // setActivities(allActivities);
+        console.log("This is all gathered RUN activities", runActivities);
 
         // Calculate summary statistics
         const totalDistance = allActivities.reduce((sum, activity) => sum + activity.distance, 0);
