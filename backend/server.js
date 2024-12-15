@@ -34,9 +34,11 @@ app.use(cors());
 // New endpoint for token exchange and data fetching
 app.post('/exchange_token', async (req, res) => {
   const { code } = req.body;
+  console.log('Received code for token exchange:', code);
 
   try {
     // Exchange the code for an access token
+    console.log('Exchanging code for access token...');
     const tokenResponse = await axios.post('https://www.strava.com/oauth/token', {
       client_id: clientID,
       client_secret: clientSecret,
@@ -45,12 +47,14 @@ app.post('/exchange_token', async (req, res) => {
     });
 
     const accessToken = tokenResponse.data.access_token;
+    console.log('Access token received:', accessToken);
 
     // Fetch all activities
     let page = 1;
     let allActivities = [];
     let fetchMore = true;
 
+    console.log('Fetching activities from Strava...');
     while (fetchMore) {
       const activitiesResponse = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
         headers: {
@@ -63,15 +67,18 @@ app.post('/exchange_token', async (req, res) => {
       });
 
       if (activitiesResponse.data.length > 0) {
+        console.log(`Fetched ${activitiesResponse.data.length} activities from page ${page}`);
         allActivities = allActivities.concat(activitiesResponse.data);
         page++;
       } else {
         fetchMore = false;
+        console.log('No more activities to fetch.');
       }
     }
 
     // Filter for run activities as an example (or just return all if desired)
     const runActivities = allActivities.filter(activity => activity.type === 'Run');
+    console.log(`Filtered ${runActivities.length} run activities.`);
 
     // Calculate summary
     const totalDistance = allActivities.reduce((sum, activity) => sum + activity.distance, 0);
@@ -91,6 +98,8 @@ app.post('/exchange_token', async (req, res) => {
       totalMovingTime,
       activityTypes,
     };
+
+    console.log('Summary calculated:', summary);
 
     // Send back the filtered activities and summary
     res.json({ activities: runActivities, summary });

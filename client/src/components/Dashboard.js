@@ -13,26 +13,42 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        console.log('Fetching data with code:', code);
         // Instead of calling Strava directly, call your own backend.
         const response = await axios.post('http://localhost:3001/exchange_token', { code });
         
         // The backend will return an object with { activities, summary }
         const { activities: fetchedActivities, summary: fetchedSummary } = response.data;
         
+        console.log('Fetched activities:', fetchedActivities);
+        console.log('Fetched summary:', fetchedSummary);
+
         setActivities(fetchedActivities);
         setSummary(fetchedSummary);
       } catch (err) {
+        console.error('Error fetching data:', err.message);
         setError(err.message);
       }
     };
 
     if (code) {
+      console.log('Code found in URL:', code);
       fetchData();
+    } else {
+      console.log('No code found in URL.');
     }
   }, [code]);
 
-  if (error) return <div>Error: {error}</div>;
-  if (!activities.length) return <div>Loading data...</div>;
+  if (error) {
+    console.error('Rendering error message:', error);
+    return <div>Error: {error}</div>;
+  }
+  if (!activities.length) {
+    console.log('Activities not yet loaded, displaying loading message.');
+    return <div>Loading data...</div>;
+  }
+
+  console.log('Rendering dashboard with activities and summary.');
 
   return (
     <div style={{ padding: '20px' }}>
