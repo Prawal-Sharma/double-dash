@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -11,56 +11,82 @@ const Dashboard = () => {
   const code = searchParams.get('code');
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchActivitiesFromDB = async (token) => {
       try {
-        console.log('Fetching data with code:', code);
-
-        // NOTE: Eventually, once you've stored activities in DynamoDB,
-        // you might switch this endpoint to something like '/activities' 
-        // which returns cached data from your database. For now, we keep as is.
-        
-        // IMPORTANT: If `/exchange_token` now requires auth, you'll need 
-        // to include the JWT in the request headers. For now, this code doesn't
-        // do that because we haven't integrated login on the frontend yet.
-        // When you do, you'd do something like:
-        // const token = localStorage.getItem('jwt'); // or however you store it
-        // const response = await axios.post('http://localhost:3001/exchange_token', { code }, {
-        //   headers: { Authorization: `Bearer ${token}` }
-        // });
-        
-        const response = await axios.post('http://localhost:3001/exchange_token', { code });
-        
-        const { activities: fetchedActivities, summary: fetchedSummary } = response.data;
-        
-        console.log('Fetched activities:', fetchedActivities);
-        console.log('Fetched summary:', fetchedSummary);
-
-        setActivities(fetchedActivities);
-        setSummary(fetchedSummary);
+        const response = await axios.get('http://localhost:3001/activities', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        return response.data; // should return { activities: [...], summary: {...} } or empty arrays if none
       } catch (err) {
-        console.error('Error fetching data:', err.message);
+        console.error('Error fetching activities from DB:', err.message);
+        throw err;
+      }
+    };
+
+    const exchangeTokenAndFetch = async (token, code) => {
+      try {
+        const response = await axios.post(
+          'http://localhost:3001/exchange_token',
+          { code },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        return response.data;
+      } catch (err) {
+        console.error('Error exchanging token:', err.message);
+        throw err;
+      }
+    };
+
+    const doFetch = async () => {
+      const token = localStorage.getItem('jwt');
+      if (!token) {
+        setError('You must be logged in to view the dashboard.');
+        return;
+      }
+
+      try {
+        if (code) {
+          // If code is present, we are connecting Strava now
+          const data = await exchangeTokenAndFetch(token, code);
+          setActivities(data.activities);
+          setSummary(data.summary);
+        } else {
+          // No code, try to fetch from DB first
+          const data = await fetchActivitiesFromDB(token);
+          if (data.activities && data.activities.length > 0) {
+            setActivities(data.activities);
+            setSummary(data.summary);
+          } else {
+            // No activities in DB and no code
+            // User needs to connect Strava
+            setActivities([]);
+            setSummary({});
+          }
+        }
+      } catch (err) {
         setError(err.message);
       }
     };
 
-    if (code) {
-      console.log('Code found in URL:', code);
-      fetchData();
-    } else {
-      console.log('No code found in URL.');
-    }
+    doFetch();
   }, [code]);
 
   if (error) {
-    console.error('Rendering error message:', error);
     return <div>Error: {error}</div>;
   }
-  if (!activities.length) {
-    console.log('Activities not yet loaded, displaying loading message.');
-    return <div>Loading data...</div>;
+
+  if (activities.length === 0 && !code) {
+    return (
+      <div style={{ padding: '20px' }}>
+        <h1>Your Strava Activities Dashboard</h1>
+        <p>No activities found. Please go to <Link to="/">Home</Link> and connect Strava.</p>
+      </div>
+    );
   }
 
-  console.log('Rendering dashboard with activities and summary.');
+  if (activities.length === 0 && code) {
+    return <div>Loading data...</div>;
+  }
 
   return (
     <div style={{ padding: '20px' }}>
@@ -81,12 +107,11 @@ const Dashboard = () => {
 
       <h2>Activities</h2>
       {activities.map((activity) => (
-        <div key={activity.id} style={{ border: '1px solid #ccc', borderRadius: '10px', padding: '20px', marginBottom: '20px' }}>
+        <div key={activity.activityId} style={{ border: '1px solid #ccc', borderRadius: '10px', padding: '20px', marginBottom: '20px' }}>
           <h3>{activity.name}</h3>
           <p><strong>Date:</strong> {new Date(activity.start_date).toLocaleString()}</p>
           <p><strong>Type:</strong> {activity.type}</p>
           <p><strong>Distance:</strong> {(activity.distance / 1000).toFixed(2)} km</p>
-          {/* Add other activity fields as needed */}
         </div>
       ))}
     </div>

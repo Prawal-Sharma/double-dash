@@ -150,6 +150,7 @@ app.get('/user/profile', authMiddleware, async (req, res) => {
   });
 });
 
+
 // =====================================
 // Strava Integration - Token Exchange
 // =====================================
@@ -308,6 +309,52 @@ app.post('/exchange_token', authMiddleware, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+app.get('/activities', authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  console.log(`Fetching activities for user ${userId} from DynamoDB...`);
+
+  try {
+    const result = await dynamoDB.query({
+      TableName: 'Activities',
+      KeyConditionExpression: 'userId = :u',
+      ExpressionAttributeValues: {
+        ':u': userId
+      }
+    }).promise();
+
+    const activities = result.Items || [];
+    if (activities.length === 0) {
+      // No activities found
+      return res.json({ activities: [], summary: {} });
+    }
+
+    // Recalculate summary from stored activities
+    const totalDistance = activities.reduce((sum, a) => sum + a.distance, 0);
+    const totalElevation = activities.reduce((sum, a) => sum + a.total_elevation_gain, 0);
+    const totalMovingTime = activities.reduce((sum, a) => sum + a.moving_time, 0);
+
+    const activityTypes = {};
+    for (const a of activities) {
+      if (!activityTypes[a.type]) activityTypes[a.type] = 0;
+      activityTypes[a.type]++;
+    }
+
+    const summary = {
+      totalActivities: activities.length,
+      totalDistance,
+      totalElevation,
+      totalMovingTime,
+      activityTypes,
+    };
+
+    res.json({ activities, summary });
+  } catch (err) {
+    console.error('Error fetching activities from DynamoDB:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 const server = new ApolloServer({ typeDefs, resolvers });
 server.start().then(() => {
