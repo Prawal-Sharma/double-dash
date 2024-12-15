@@ -39,6 +39,7 @@ app.use(cors());
 // Authentication Helpers
 // =====================
 async function findUserByEmail(email) {
+  console.log('Finding user by email:', email);
   // For now, we do a scan. In production, set up a GSI for quick lookups.
   const result = await dynamoDB.scan({
     TableName: 'Users',
@@ -47,17 +48,26 @@ async function findUserByEmail(email) {
     ExpressionAttributeValues: { ':email': email },
   }).promise();
 
+  console.log('User found:', result.Items.length > 0);
   return result.Items.length > 0 ? result.Items[0] : null;
 }
 
 function authMiddleware(req, res, next) {
+  console.log('Authenticating request...');
   const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: 'No token provided' });
+  if (!authHeader) {
+    console.log('No token provided');
+    return res.status(401).json({ error: 'No token provided' });
+  }
 
   const token = authHeader.split(' ')[1];
   jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-    if (err) return res.status(401).json({ error: 'Invalid token' });
+    if (err) {
+      console.log('Invalid token');
+      return res.status(401).json({ error: 'Invalid token' });
+    }
     req.user = decoded; // decoded contains userId
+    console.log('Token verified, user authenticated:', req.user.userId);
     next();
   });
 }
@@ -69,13 +79,16 @@ function authMiddleware(req, res, next) {
 // Register a new user
 app.post('/register', async (req, res) => {
   const { email, password } = req.body;
+  console.log('Registering new user:', email);
   if (!email || !password) {
+    console.log('Email and password are required');
     return res.status(400).json({ error: 'Email and password are required.' });
   }
 
   // Check if user already exists
   const existingUser = await findUserByEmail(email);
   if (existingUser) {
+    console.log('User already exists:', email);
     return res.status(400).json({ error: 'User already exists.' });
   }
 
@@ -93,39 +106,50 @@ app.post('/register', async (req, res) => {
     },
   }).promise();
 
+  console.log('User registered successfully:', email);
   res.json({ message: 'User registered successfully' });
 });
 
 // Login
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
+  console.log('Logging in user:', email);
   if (!email || !password) {
+    console.log('Email and password are required');
     return res.status(400).json({ error: 'Email and password are required.' });
   }
 
   const user = await findUserByEmail(email);
   if (!user) {
+    console.log('Invalid credentials for user:', email);
     return res.status(400).json({ error: 'Invalid credentials' });
   }
 
   const match = await bcrypt.compare(password, user.hashedPassword);
   if (!match) {
+    console.log('Invalid credentials for user:', email);
     return res.status(400).json({ error: 'Invalid credentials' });
   }
 
   const token = jwt.sign({ userId: user.userId }, process.env.JWT_SECRET, { expiresIn: '1h' });
+  console.log('User logged in successfully:', email);
   res.json({ token });
 });
 
 // Example protected route (just to show it works)
 app.get('/user/profile', authMiddleware, async (req, res) => {
+  console.log('Fetching user profile for user:', req.user.userId);
   const userData = await dynamoDB.get({
     TableName: 'Users',
     Key: { userId: req.user.userId },
   }).promise();
 
-  if (!userData.Item) return res.status(404).json({ error: 'User not found' });
+  if (!userData.Item) {
+    console.log('User not found:', req.user.userId);
+    return res.status(404).json({ error: 'User not found' });
+  }
 
+  console.log('User profile fetched successfully:', req.user.userId);
   res.json({
     email: userData.Item.email,
     preferences: userData.Item.preferences
