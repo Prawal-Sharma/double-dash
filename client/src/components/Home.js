@@ -1,7 +1,7 @@
 import React from 'react';
 
 const Home = () => {
-  const clientID = '136786';
+  const clientID = process.env.REACT_APP_STRAVA_CLIENT_ID;
   const redirectURI = 'http://localhost:3000/exchange_token';
   const scope = 'read,activity:read';
 
