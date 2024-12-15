@@ -5,6 +5,10 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 require('dotenv').config();
 const axios = require('axios');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
+const dynamoDB = require('./dynamodb'); // Make sure dynamodb.js is in the same directory
 
 AWS.config.update({
   region: 'us-east-1',
@@ -12,8 +16,8 @@ AWS.config.update({
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
 });
 
-const clientID = process.env.STRAVA_CLIENT_ID;       // Store in .env file
-const clientSecret = process.env.STRAVA_CLIENT_SECRET; // Store in .env file
+const clientID = process.env.STRAVA_CLIENT_ID; // from .env
+const clientSecret = process.env.STRAVA_CLIENT_SECRET; // from .env
 
 const typeDefs = gql`
   type Query {
@@ -31,13 +35,112 @@ const app = express();
 app.use(bodyParser.json());
 app.use(cors());
 
-// New endpoint for token exchange and data fetching
+// =====================
+// Authentication Helpers
+// =====================
+async function findUserByEmail(email) {
+  // For now, we do a scan. In production, set up a GSI for quick lookups.
+  const result = await dynamoDB.scan({
+    TableName: 'Users',
+    FilterExpression: '#em = :email',
+    ExpressionAttributeNames: { '#em': 'email' },
+    ExpressionAttributeValues: { ':email': email },
+  }).promise();
+
+  return result.Items.length > 0 ? result.Items[0] : null;
+}
+
+function authMiddleware(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'No token provided' });
+
+  const token = authHeader.split(' ')[1];
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) return res.status(401).json({ error: 'Invalid token' });
+    req.user = decoded; // decoded contains userId
+    next();
+  });
+}
+
+// ================
+// User Endpoints
+// ================
+
+// Register a new user
+app.post('/register', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required.' });
+  }
+
+  // Check if user already exists
+  const existingUser = await findUserByEmail(email);
+  if (existingUser) {
+    return res.status(400).json({ error: 'User already exists.' });
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const userId = uuidv4();
+
+  await dynamoDB.put({
+    TableName: 'Users',
+    Item: {
+      userId,
+      email,
+      hashedPassword,
+      createdAt: new Date().toISOString(),
+      preferences: {},
+    },
+  }).promise();
+
+  res.json({ message: 'User registered successfully' });
+});
+
+// Login
+app.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required.' });
+  }
+
+  const user = await findUserByEmail(email);
+  if (!user) {
+    return res.status(400).json({ error: 'Invalid credentials' });
+  }
+
+  const match = await bcrypt.compare(password, user.hashedPassword);
+  if (!match) {
+    return res.status(400).json({ error: 'Invalid credentials' });
+  }
+
+  const token = jwt.sign({ userId: user.userId }, process.env.JWT_SECRET, { expiresIn: '1h' });
+  res.json({ token });
+});
+
+// Example protected route (just to show it works)
+app.get('/user/profile', authMiddleware, async (req, res) => {
+  const userData = await dynamoDB.get({
+    TableName: 'Users',
+    Key: { userId: req.user.userId },
+  }).promise();
+
+  if (!userData.Item) return res.status(404).json({ error: 'User not found' });
+
+  res.json({
+    email: userData.Item.email,
+    preferences: userData.Item.preferences
+  });
+});
+
+// =====================================
+// Strava Integration - Token Exchange
+// =====================================
+// NOTE: If you want this route to require login, just add `authMiddleware` before (req, res).
 app.post('/exchange_token', async (req, res) => {
   const { code } = req.body;
   console.log('Received code for token exchange:', code);
 
   try {
-    // Exchange the code for an access token
     console.log('Exchanging code for access token...');
     const tokenResponse = await axios.post('https://www.strava.com/oauth/token', {
       client_id: clientID,
@@ -76,7 +179,7 @@ app.post('/exchange_token', async (req, res) => {
       }
     }
 
-    // Filter for run activities as an example (or just return all if desired)
+    // Filter for run activities as an example
     const runActivities = allActivities.filter(activity => activity.type === 'Run');
     console.log(`Filtered ${runActivities.length} run activities.`);
 
@@ -101,7 +204,7 @@ app.post('/exchange_token', async (req, res) => {
 
     console.log('Summary calculated:', summary);
 
-    // Send back the filtered activities and summary
+    // Return the data to frontend
     res.json({ activities: runActivities, summary });
   } catch (error) {
     console.error('Error exchanging token or fetching data:', error);
