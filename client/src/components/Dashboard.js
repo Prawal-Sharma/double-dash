@@ -14,10 +14,22 @@ const Dashboard = () => {
     const fetchData = async () => {
       try {
         console.log('Fetching data with code:', code);
-        // Instead of calling Strava directly, call your own backend.
+
+        // NOTE: Eventually, once you've stored activities in DynamoDB,
+        // you might switch this endpoint to something like '/activities' 
+        // which returns cached data from your database. For now, we keep as is.
+        
+        // IMPORTANT: If `/exchange_token` now requires auth, you'll need 
+        // to include the JWT in the request headers. For now, this code doesn't
+        // do that because we haven't integrated login on the frontend yet.
+        // When you do, you'd do something like:
+        // const token = localStorage.getItem('jwt'); // or however you store it
+        // const response = await axios.post('http://localhost:3001/exchange_token', { code }, {
+        //   headers: { Authorization: `Bearer ${token}` }
+        // });
+        
         const response = await axios.post('http://localhost:3001/exchange_token', { code });
         
-        // The backend will return an object with { activities, summary }
         const { activities: fetchedActivities, summary: fetchedSummary } = response.data;
         
         console.log('Fetched activities:', fetchedActivities);

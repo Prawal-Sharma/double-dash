@@ -40,7 +40,6 @@ app.use(cors());
 // =====================
 async function findUserByEmail(email) {
   console.log('Finding user by email:', email);
-  // For now, we do a scan. In production, set up a GSI for quick lookups.
   const result = await dynamoDB.scan({
     TableName: 'Users',
     FilterExpression: '#em = :email',
@@ -75,8 +74,6 @@ function authMiddleware(req, res, next) {
 // ================
 // User Endpoints
 // ================
-
-// Register a new user
 app.post('/register', async (req, res) => {
   const { email, password } = req.body;
   console.log('Registering new user:', email);
@@ -85,7 +82,6 @@ app.post('/register', async (req, res) => {
     return res.status(400).json({ error: 'Email and password are required.' });
   }
 
-  // Check if user already exists
   const existingUser = await findUserByEmail(email);
   if (existingUser) {
     console.log('User already exists:', email);
@@ -110,7 +106,6 @@ app.post('/register', async (req, res) => {
   res.json({ message: 'User registered successfully' });
 });
 
-// Login
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
   console.log('Logging in user:', email);
@@ -136,7 +131,6 @@ app.post('/login', async (req, res) => {
   res.json({ token });
 });
 
-// Example protected route (just to show it works)
 app.get('/user/profile', authMiddleware, async (req, res) => {
   console.log('Fetching user profile for user:', req.user.userId);
   const userData = await dynamoDB.get({
@@ -159,8 +153,8 @@ app.get('/user/profile', authMiddleware, async (req, res) => {
 // =====================================
 // Strava Integration - Token Exchange
 // =====================================
-// NOTE: If you want this route to require login, just add `authMiddleware` before (req, res).
-app.post('/exchange_token', async (req, res) => {
+// Protect this route so only authenticated users can connect Strava.
+app.post('/exchange_token', authMiddleware, async (req, res) => {
   const { code } = req.body;
   console.log('Received code for token exchange:', code);
 
@@ -173,8 +167,23 @@ app.post('/exchange_token', async (req, res) => {
       grant_type: 'authorization_code',
     });
 
-    const accessToken = tokenResponse.data.access_token;
-    console.log('Access token received:', accessToken);
+    const { access_token, refresh_token, expires_at } = tokenResponse.data;
+    const userId = req.user.userId;
+
+    console.log('Access token received:', access_token);
+
+    // Store the Strava tokens in the Users table
+    await dynamoDB.update({
+      TableName: 'Users',
+      Key: { userId },
+      UpdateExpression: 'SET accessToken = :at, refreshToken = :rt, expiresAt = :ea',
+      ExpressionAttributeValues: {
+        ':at': access_token,
+        ':rt': refresh_token,
+        ':ea': expires_at
+      }
+    }).promise();
+    console.log('Strava tokens stored for user:', userId);
 
     // Fetch all activities
     let page = 1;
@@ -185,7 +194,7 @@ app.post('/exchange_token', async (req, res) => {
     while (fetchMore) {
       const activitiesResponse = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${access_token}`,
         },
         params: {
           per_page: 200,
@@ -228,7 +237,71 @@ app.post('/exchange_token', async (req, res) => {
 
     console.log('Summary calculated:', summary);
 
-    // Return the data to frontend
+    // Store activities in Activities table
+    // Make sure you've created a table named "Activities" with userId as PK and activityId as SK
+    console.log('Storing activities in DynamoDB...');
+    for (const activity of runActivities) {
+      await dynamoDB.put({
+        TableName: 'Activities',
+        Item: {
+          userId: userId,
+          activityId: activity.id.toString(),
+          achievement_count: activity.achievement_count,
+          athlete: activity.athlete,
+          athlete_count: activity.athlete_count,
+          average_cadence: activity.average_cadence,
+          average_heartrate: activity.average_heartrate,
+          average_speed: activity.average_speed,
+          comment_count: activity.comment_count,
+          commute: activity.commute,
+          display_hide_heartrate_option: activity.display_hide_heartrate_option,
+          distance: activity.distance,
+          elapsed_time: activity.elapsed_time,
+          elev_high: activity.elev_high,
+          elev_low: activity.elev_low,
+          end_latlng: activity.end_latlng,
+          external_id: activity.external_id,
+          flagged: activity.flagged,
+          from_accepted_tag: activity.from_accepted_tag,
+          gear_id: activity.gear_id,
+          has_heartrate: activity.has_heartrate,
+          has_kudoed: activity.has_kudoed,
+          heartrate_opt_out: activity.heartrate_opt_out,
+          name: activity.name,
+          kudos_count: activity.kudos_count,
+          location_city: activity.location_city,
+          location_country: activity.location_country,
+          location_state: activity.location_state,
+          manual: activity.manual,
+          map: activity.map,
+          max_heartrate: activity.max_heartrate,
+          max_speed: activity.max_speed,
+          moving_time: activity.moving_time,
+          photo_count: activity.photo_count,
+          pr_count: activity.pr_count,
+          private: activity.private,
+          resource_state: activity.resource_state,
+          sport_type: activity.sport_type,
+          start_date: activity.start_date,
+          start_date_local: activity.start_date_local,
+          start_latlng: activity.start_latlng,
+          suffer_score: activity.suffer_score,
+          timezone: activity.timezone,
+          total_elevation_gain: activity.total_elevation_gain,
+          total_photo_count: activity.total_photo_count,
+          trainer: activity.trainer,
+          type: activity.type,
+          upload_id: activity.upload_id,
+          upload_id_str: activity.upload_id_str,
+          utc_offset: activity.utc_offset,
+          visibility: activity.visibility,
+          workout_type: activity.workout_type
+        },
+      }).promise();
+    }
+    console.log(`Stored ${runActivities.length} activities for user ${userId} in DynamoDB.`);
+
+    // Return the filtered run activities and summary to the frontend
     res.json({ activities: runActivities, summary });
   } catch (error) {
     console.error('Error exchanging token or fetching data:', error);
