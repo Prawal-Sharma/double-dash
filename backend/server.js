@@ -1,4 +1,3 @@
-const { ApolloServer, gql } = require('apollo-server-express');
 const express = require('express');
 const AWS = require('aws-sdk');
 const bodyParser = require('body-parser');
@@ -8,7 +7,7 @@ const axios = require('axios');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
-const dynamoDB = require('./dynamodb'); // Make sure dynamodb.js is in the same directory
+const dynamoDB = require('./dynamodb');
 
 AWS.config.update({
   region: 'us-east-1',
@@ -16,20 +15,8 @@ AWS.config.update({
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
 });
 
-const clientID = process.env.STRAVA_CLIENT_ID; // from .env
-const clientSecret = process.env.STRAVA_CLIENT_SECRET; // from .env
-
-const typeDefs = gql`
-  type Query {
-    hello: String
-  }
-`;
-
-const resolvers = {
-  Query: {
-    hello: () => 'Hello from Apollo Server!',
-  },
-};
+const clientID = process.env.STRAVA_CLIENT_ID;
+const clientSecret = process.env.STRAVA_CLIENT_SECRET;
 
 const app = express();
 app.use(bodyParser.json());
@@ -60,6 +47,7 @@ function authMiddleware(req, res, next) {
   }
 
   const token = authHeader.split(' ')[1];
+  console.log('authMiddleware, token', token);
   jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) {
       console.log('Invalid token');
@@ -150,11 +138,9 @@ app.get('/user/profile', authMiddleware, async (req, res) => {
   });
 });
 
-
 // =====================================
 // Strava Integration - Token Exchange
 // =====================================
-// Protect this route so only authenticated users can connect Strava.
 app.post('/exchange_token', authMiddleware, async (req, res) => {
   const { code } = req.body;
   console.log('Received code for token exchange:', code);
@@ -238,8 +224,7 @@ app.post('/exchange_token', authMiddleware, async (req, res) => {
 
     console.log('Summary calculated:', summary);
 
-    // Store activities in Activities table
-    // Make sure you've created a table named "Activities" with userId as PK and activityId as SK
+    // Store run activities in Activities table
     console.log('Storing activities in DynamoDB...');
     for (const activity of runActivities) {
       await dynamoDB.put({
@@ -355,11 +340,7 @@ app.get('/activities', authMiddleware, async (req, res) => {
   }
 });
 
-
-const server = new ApolloServer({ typeDefs, resolvers });
-server.start().then(() => {
-  server.applyMiddleware({ app });
-  app.listen(3001, () => {
-    console.log('Server running on http://localhost:3001' + server.graphqlPath);
-  });
+// Start Express server without Apollo
+app.listen(3001, () => {
+  console.log('Server running on http://localhost:3001');
 });
