@@ -56,7 +56,8 @@ const Dashboard = () => {
           console.log('Code present. Exchanging token and fetching data.');
           const data = await exchangeTokenAndFetch(token, code);
           console.log("This is the data from the if statement", data);
-          setActivities(data.activities);
+          const sortedActivities = data.activities.sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+          setActivities(sortedActivities);
           setSummary(data.summary);
           console.log('Activities and summary set from exchanged token data.');
         } else {
@@ -64,7 +65,8 @@ const Dashboard = () => {
           const data = await fetchActivitiesFromDB(token);
           console.log("This is the data from the else statement", data);
           if (data.activities && data.activities.length > 0) {
-            setActivities(data.activities);
+            const sortedActivities = data.activities.sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+            setActivities(sortedActivities);
             setSummary(data.summary);
             console.log('Activities and summary set from DB data.');
           } else {
@@ -102,6 +104,10 @@ const Dashboard = () => {
     return <div style={{ textAlign: 'center', marginTop: '20px' }}>Loading data...</div>;
   }
 
+  const convertMetersToMiles = (meters) => (meters / 1609.34).toFixed(2);
+  const convertMetersToFeet = (meters) => (meters * 3.28084).toFixed(2);
+  const convertSecondsToHours = (seconds) => (seconds / 3600).toFixed(2);
+
   console.log('Rendering dashboard with activities and summary.');
   return (
     <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
@@ -109,9 +115,9 @@ const Dashboard = () => {
       <div style={{ marginBottom: '40px', backgroundColor: '#f9f9f9', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)' }}>
         <h2>Summary</h2>
         <p><strong>Total Activities:</strong> {summary.totalActivities}</p>
-        <p><strong>Total Distance:</strong> {(summary.totalDistance / 1000).toFixed(2)} km</p>
-        <p><strong>Total Elevation Gain:</strong> {summary.totalElevation} meters</p>
-        <p><strong>Total Moving Time:</strong> {(summary.totalMovingTime / 3600).toFixed(2)} hours</p>
+        <p><strong>Total Distance:</strong> {convertMetersToMiles(summary.totalDistance)} miles</p>
+        <p><strong>Total Elevation Gain:</strong> {convertMetersToFeet(summary.totalElevation)} feet</p>
+        <p><strong>Total Moving Time:</strong> {convertSecondsToHours(summary.totalMovingTime)} hours</p>
         <h3>Activities by Type:</h3>
         <ul>
           {Object.keys(summary.activityTypes || {}).map((type) => (
@@ -126,7 +132,7 @@ const Dashboard = () => {
           <h3>{activity.name}</h3>
           <p><strong>Date:</strong> {new Date(activity.start_date).toLocaleString()}</p>
           <p><strong>Type:</strong> {activity.type}</p>
-          <p><strong>Distance:</strong> {(activity.distance / 1000).toFixed(2)} km</p>
+          <p><strong>Distance:</strong> {convertMetersToMiles(activity.distance)} miles</p>
         </div>
       ))}
     </div>
