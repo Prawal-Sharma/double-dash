@@ -342,28 +342,24 @@ app.get('/activities', authMiddleware, async (req, res) => {
 
 app.get('/activities/refresh', authMiddleware, async (req, res) => {
   const userId = req.user.userId;
-  console.log(`Starting refresh process for user: ${userId}`);
 
   try {
     // 1) Retrieve user from "Users" table
-    console.log('Retrieving user from Users table...');
     const userResult = await dynamoDB.get({
       TableName: 'Users',
       Key: { userId },
     }).promise();
 
     if (!userResult.Item) {
-      console.log('User not found in Users table.');
       return res.status(404).json({ error: 'User not found' });
     }
 
     let { refreshToken, expiresAt, accessToken } = userResult.Item;
-    console.log('User retrieved successfully. Checking token expiration...');
 
     // 2) Check if the access token is expired
     const currentTime = Math.floor(Date.now() / 1000);
     if (expiresAt < currentTime) {
-      console.log('Access token expired. Refreshing Strava token...');
+      // Refresh the token using Strava's refresh endpoint
       const refreshResponse = await axios.post('https://www.strava.com/oauth/token', {
         client_id: clientID,
         client_secret: clientSecret,
@@ -374,10 +370,8 @@ app.get('/activities/refresh', authMiddleware, async (req, res) => {
       accessToken = refreshResponse.data.access_token;
       refreshToken = refreshResponse.data.refresh_token;
       expiresAt = refreshResponse.data.expires_at;
-      console.log('Strava token refreshed successfully.');
 
       // Update tokens in DynamoDB
-      console.log('Updating tokens in DynamoDB...');
       await dynamoDB.update({
         TableName: 'Users',
         Key: { userId },
@@ -388,9 +382,6 @@ app.get('/activities/refresh', authMiddleware, async (req, res) => {
           ':ea': expiresAt,
         },
       }).promise();
-      console.log('Tokens updated in DynamoDB.');
-    } else {
-      console.log('Access token is still valid.');
     }
 
     // 3) Fetch new activities from Strava
@@ -398,7 +389,6 @@ app.get('/activities/refresh', authMiddleware, async (req, res) => {
     let allActivities = [];
     let fetchMore = true;
 
-    console.log(`Fetching updated activities from Strava for user: ${userId}`);
     while (fetchMore) {
       const activitiesResponse = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
         headers: {
@@ -411,39 +401,43 @@ app.get('/activities/refresh', authMiddleware, async (req, res) => {
       });
 
       if (activitiesResponse.data.length > 0) {
-        console.log(`Fetched ${activitiesResponse.data.length} activities from page ${page}`);
         allActivities = allActivities.concat(activitiesResponse.data);
         page++;
       } else {
         fetchMore = false;
-        console.log('No more activities to fetch.');
       }
     }
 
-    // 4) Upsert them in DynamoDB. For example, store only "Run" activities (adjust if needed).
-    console.log('Filtering and storing run activities in DynamoDB...');
-    const runActivities = allActivities.filter(a => a.type === 'Run');
-
-    for (const activity of runActivities) {
-      await dynamoDB.put({
-        TableName: 'Activities',
-        Item: {
-          userId: userId,
-          activityId: activity.id.toString(),
-          start_date: activity.start_date,
-          name: activity.name,
-          distance: activity.distance,
-          moving_time: activity.moving_time,
-          total_elevation_gain: activity.total_elevation_gain,
-          type: activity.type,
-          // Any additional fields you want...
-        },
-      }).promise();
+    // 4) Upsert new activities in DynamoDB (avoiding duplicates)
+    const relevantActivities = allActivities.filter(a => a.type === 'Run'); // or adapt filter as needed
+    for (const activity of relevantActivities) {
+      try {
+        await dynamoDB.put({
+          TableName: 'Activities',
+          Item: {
+            userId,
+            activityId: activity.id.toString(),
+            start_date: activity.start_date,
+            name: activity.name,
+            distance: activity.distance,
+            moving_time: activity.moving_time,
+            total_elevation_gain: activity.total_elevation_gain,
+            type: activity.type,
+          },
+          // Conditional expression to ensure no duplicate "activityId" is inserted for this user
+          ConditionExpression: 'attribute_not_exists(activityId)',
+        }).promise();
+      } catch (err) {
+        if (err.code === 'ConditionalCheckFailedException') {
+          // This means the activity already exists
+          console.log(`Activity ${activity.id} already in DB, skipping...`);
+        } else {
+          throw err;
+        }
+      }
     }
-    console.log(`Stored ${runActivities.length} run activities in DynamoDB.`);
 
-    // Recalculate summary for all stored run activities
-    console.log('Recalculating summary for stored activities...');
+    // 5) Recalculate summary for all stored activities
     const queryResult = await dynamoDB.query({
       TableName: 'Activities',
       KeyConditionExpression: 'userId = :u',
@@ -470,7 +464,6 @@ app.get('/activities/refresh', authMiddleware, async (req, res) => {
       activityTypes,
     };
 
-    console.log('Summary recalculated successfully.');
     return res.json({
       activities: storedActivities,
       summary,
