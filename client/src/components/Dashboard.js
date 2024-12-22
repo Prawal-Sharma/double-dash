@@ -57,6 +57,8 @@ const Dashboard = () => {
           const data = await exchangeTokenAndFetch(token, code);
           console.log("This is the data from the if statement", data);
           const sortedActivities = data.activities.sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+          console.log("This is the data from the if statement sorted", sortedActivities);
+
           setActivities(sortedActivities);
           setSummary(data.summary);
           console.log('Activities and summary set from exchanged token data.');
@@ -66,6 +68,8 @@ const Dashboard = () => {
           console.log("This is the data from the else statement", data);
           if (data.activities && data.activities.length > 0) {
             const sortedActivities = data.activities.sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+            console.log("This is the data from the else statement sorted", sortedActivities);
+
             setActivities(sortedActivities);
             setSummary(data.summary);
             console.log('Activities and summary set from DB data.');

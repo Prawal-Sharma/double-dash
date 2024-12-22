@@ -9,19 +9,31 @@ const Register = () => {
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
 
+  // Adjust clientID, redirectURI, and scope for Strava
+  const clientID = '136786'; 
+  const redirectURI = 'http://localhost:3000/exchange_token';
+  const scope = 'read,activity:read';
+  const stravaAuthURL = `http://www.strava.com/oauth/authorize?client_id=${clientID}&response_type=code&redirect_uri=${redirectURI}&approval_prompt=force&scope=${scope}`;
+
   const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
 
     try {
-      const response = await axios.post('http://localhost:3001/register', { email, password });
-      if (response.data.message === 'User registered successfully') {
-        setSuccess('User registered! You can now login.');
-        // Redirect after a delay or let them click a link
-        setTimeout(() => {
-          navigate('/login');
-        }, 2000);
+      // First, register the user
+      const registerResponse = await axios.post('http://localhost:3001/register', { email, password });
+      if (registerResponse.data.message === 'User registered successfully') {
+        setSuccess('User registered! Connecting to Strava...');
+
+        // Next, automatically login to get JWT
+        const loginResponse = await axios.post('http://localhost:3001/login', { email, password });
+        const { token } = loginResponse.data;
+        // Store JWT in localStorage
+        localStorage.setItem('jwt', token);
+
+        // Redirect them immediately to Strava's Auth page
+        window.location.href = stravaAuthURL;
       }
     } catch (err) {
       console.error('Register error:', err);
@@ -53,7 +65,7 @@ const Register = () => {
             required
           />
         </div>
-        <button type="submit">Register</button>
+        <button type="submit">Register & Connect Strava</button>
       </form>
     </div>
   );
