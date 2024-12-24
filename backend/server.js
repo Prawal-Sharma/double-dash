@@ -200,6 +200,7 @@ app.post('/exchange_token', authMiddleware, async (req, res) => {
     }
 
     // Filter for run activities as an example
+    console.log('All activities BEFORE WE STORE ANYTHING!!!:', allActivities);
     const runActivities = allActivities.filter(activity => activity.type === 'Run');
     console.log(`Filtered ${runActivities.length} run activities.`);
 
@@ -235,6 +236,7 @@ app.post('/exchange_token', authMiddleware, async (req, res) => {
           activityId: activity.id.toString(),
           achievement_count: activity.achievement_count,
           athlete: activity.athlete,
+          athlete_id: activity.athlete.id, // Added
           athlete_count: activity.athlete_count,
           average_cadence: activity.average_cadence,
           average_heartrate: activity.average_heartrate,
@@ -247,23 +249,26 @@ app.post('/exchange_token', authMiddleware, async (req, res) => {
           elev_high: activity.elev_high,
           elev_low: activity.elev_low,
           end_latlng: activity.end_latlng,
+          end_lat: activity.end_latlng[0], // Added
+          end_lng: activity.end_latlng[1], // Added
           external_id: activity.external_id,
           flagged: activity.flagged,
           from_accepted_tag: activity.from_accepted_tag,
           gear_id: activity.gear_id,
           has_heartrate: activity.has_heartrate,
-          has_kudoed: activity.has_kudoed,
+          has_kudoed: activity.has_kudoed, // Added
           heartrate_opt_out: activity.heartrate_opt_out,
-          name: activity.name,
           kudos_count: activity.kudos_count,
           location_city: activity.location_city,
           location_country: activity.location_country,
           location_state: activity.location_state,
           manual: activity.manual,
           map: activity.map,
+          summary_polyline: activity.map.summary_polyline, // Added
           max_heartrate: activity.max_heartrate,
           max_speed: activity.max_speed,
           moving_time: activity.moving_time,
+          name: activity.name,
           photo_count: activity.photo_count,
           pr_count: activity.pr_count,
           private: activity.private,
@@ -272,6 +277,8 @@ app.post('/exchange_token', authMiddleware, async (req, res) => {
           start_date: activity.start_date,
           start_date_local: activity.start_date_local,
           start_latlng: activity.start_latlng,
+          start_lat: activity.start_latlng[0], // Added
+          start_lng: activity.start_latlng[1], // Added
           suffer_score: activity.suffer_score,
           timezone: activity.timezone,
           total_elevation_gain: activity.total_elevation_gain,
@@ -283,7 +290,7 @@ app.post('/exchange_token', authMiddleware, async (req, res) => {
           utc_offset: activity.utc_offset,
           visibility: activity.visibility,
           workout_type: activity.workout_type
-        },
+      },
       }).promise();
       console.log(`Activity ${activity.id} stored successfully.`);
     }
