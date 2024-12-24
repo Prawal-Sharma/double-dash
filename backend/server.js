@@ -227,6 +227,7 @@ app.post('/exchange_token', authMiddleware, async (req, res) => {
     // Store run activities in Activities table
     console.log('Storing activities in DynamoDB...');
     for (const activity of runActivities) {
+      console.log(`Storing activity ${activity.id} for user ${userId}`);
       await dynamoDB.put({
         TableName: 'Activities',
         Item: {
@@ -284,6 +285,7 @@ app.post('/exchange_token', authMiddleware, async (req, res) => {
           workout_type: activity.workout_type
         },
       }).promise();
+      console.log(`Activity ${activity.id} stored successfully.`);
     }
     console.log(`Stored ${runActivities.length} activities for user ${userId} in DynamoDB.`);
 
@@ -310,6 +312,7 @@ app.get('/activities', authMiddleware, async (req, res) => {
 
     const activities = result.Items || [];
     if (activities.length === 0) {
+      console.log('No activities found for user:', userId);
       // No activities found
       return res.json({ activities: [], summary: {} });
     }
@@ -333,6 +336,7 @@ app.get('/activities', authMiddleware, async (req, res) => {
       activityTypes,
     };
 
+    console.log('Activities and summary fetched successfully for user:', userId);
     res.json({ activities, summary });
   } catch (err) {
     console.error('Error fetching activities from DynamoDB:', err);
@@ -342,6 +346,7 @@ app.get('/activities', authMiddleware, async (req, res) => {
 
 app.get('/activities/refresh', authMiddleware, async (req, res) => {
   const userId = req.user.userId;
+  console.log(`Refreshing activities for user ${userId}...`);
 
   try {
     // 1) Retrieve user from "Users" table
@@ -351,6 +356,7 @@ app.get('/activities/refresh', authMiddleware, async (req, res) => {
     }).promise();
 
     if (!userResult.Item) {
+      console.log('User not found:', userId);
       return res.status(404).json({ error: 'User not found' });
     }
 
@@ -359,6 +365,7 @@ app.get('/activities/refresh', authMiddleware, async (req, res) => {
     // 2) Check if the access token is expired
     const currentTime = Math.floor(Date.now() / 1000);
     if (expiresAt < currentTime) {
+      console.log('Access token expired, refreshing token...');
       // Refresh the token using Strava's refresh endpoint
       const refreshResponse = await axios.post('https://www.strava.com/oauth/token', {
         client_id: clientID,
@@ -382,6 +389,7 @@ app.get('/activities/refresh', authMiddleware, async (req, res) => {
           ':ea': expiresAt,
         },
       }).promise();
+      console.log('Tokens refreshed and updated in DynamoDB for user:', userId);
     }
 
     // 3) Fetch new activities from Strava
@@ -389,6 +397,7 @@ app.get('/activities/refresh', authMiddleware, async (req, res) => {
     let allActivities = [];
     let fetchMore = true;
 
+    console.log('Fetching new activities from Strava...');
     while (fetchMore) {
       const activitiesResponse = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
         headers: {
@@ -401,10 +410,12 @@ app.get('/activities/refresh', authMiddleware, async (req, res) => {
       });
 
       if (activitiesResponse.data.length > 0) {
+        console.log(`Fetched ${activitiesResponse.data.length} activities from page ${page}`);
         allActivities = allActivities.concat(activitiesResponse.data);
         page++;
       } else {
         fetchMore = false;
+        console.log('No more activities to fetch.');
       }
     }
 
@@ -412,6 +423,7 @@ app.get('/activities/refresh', authMiddleware, async (req, res) => {
     const relevantActivities = allActivities.filter(a => a.type === 'Run'); // or adapt filter as needed
     for (const activity of relevantActivities) {
       try {
+        console.log(`Upserting activity ${activity.id} for user ${userId}`);
         await dynamoDB.put({
           TableName: 'Activities',
           Item: {
@@ -427,11 +439,13 @@ app.get('/activities/refresh', authMiddleware, async (req, res) => {
           // Conditional expression to ensure no duplicate "activityId" is inserted for this user
           ConditionExpression: 'attribute_not_exists(activityId)',
         }).promise();
+        console.log(`Activity ${activity.id} upserted successfully.`);
       } catch (err) {
         if (err.code === 'ConditionalCheckFailedException') {
           // This means the activity already exists
           console.log(`Activity ${activity.id} already in DB, skipping...`);
         } else {
+          console.error(`Error upserting activity ${activity.id}:`, err);
           throw err;
         }
       }
@@ -464,6 +478,7 @@ app.get('/activities/refresh', authMiddleware, async (req, res) => {
       activityTypes,
     };
 
+    console.log('Activities refreshed and summary recalculated for user:', userId);
     return res.json({
       activities: storedActivities,
       summary,

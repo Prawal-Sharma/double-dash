@@ -19,20 +19,28 @@ const Register = () => {
     e.preventDefault();
     setError('');
     setSuccess('');
+    console.log('Register form submitted with email:', email);
 
     try {
       // First, register the user
+      console.log('Attempting to register user...');
       const registerResponse = await axios.post('http://localhost:3001/register', { email, password });
+      console.log('Register response:', registerResponse.data);
+
       if (registerResponse.data.message === 'User registered successfully') {
         setSuccess('User registered! Connecting to Strava...');
+        console.log('User registered successfully. Proceeding to login...');
 
         // Next, automatically login to get JWT
         const loginResponse = await axios.post('http://localhost:3001/login', { email, password });
+        console.log('Login response:', loginResponse.data);
         const { token } = loginResponse.data;
         // Store JWT in localStorage
         localStorage.setItem('jwt', token);
+        console.log('JWT stored in localStorage:', token);
 
         // Redirect them immediately to Strava's Auth page
+        console.log('Redirecting to Strava Auth URL:', stravaAuthURL);
         window.location.href = stravaAuthURL;
       }
     } catch (err) {
@@ -52,7 +60,10 @@ const Register = () => {
           <input 
             type="email" 
             value={email}
-            onChange={e=>setEmail(e.target.value)}
+            onChange={e => {
+              setEmail(e.target.value);
+              console.log('Email input changed:', e.target.value);
+            }}
             required
           />
         </div>
@@ -61,7 +72,10 @@ const Register = () => {
           <input 
             type="password" 
             value={password}
-            onChange={e=>setPassword(e.target.value)}
+            onChange={e => {
+              setPassword(e.target.value);
+              console.log('Password input changed:', e.target.value);
+            }}
             required
           />
         </div>
