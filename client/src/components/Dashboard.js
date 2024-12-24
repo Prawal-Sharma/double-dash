@@ -26,10 +26,12 @@ const Dashboard = () => {
 
   useEffect(() => {
     const fetchActivitiesFromDB = async (token) => {
+      console.log('Fetching activities from DB with token:', token);
       try {
         const response = await axios.get('http://localhost:3001/activities', {
           headers: { Authorization: `Bearer ${token}` }
         });
+        console.log('Activities fetched from DB:', response.data);
         return response.data;
       } catch (err) {
         console.error('Error fetching activities from DB:', err.message);
@@ -38,12 +40,14 @@ const Dashboard = () => {
     };
 
     const exchangeTokenAndFetch = async (token, code) => {
+      console.log('Exchanging token with Strava. Token:', token, 'Code:', code);
       try {
         const response = await axios.post(
           'http://localhost:3001/exchange_token',
           { code },
           { headers: { Authorization: `Bearer ${token}` } }
         );
+        console.log('Token exchanged and activities fetched:', response.data);
         return response.data;
       } catch (err) {
         console.error('Error exchanging token:', err.message);
@@ -63,22 +67,27 @@ const Dashboard = () => {
         let data;
         if (code) {
           // Exchange token with Strava
+          console.log('Code found in URL. Exchanging token with Strava.');
           data = await exchangeTokenAndFetch(token, code);
         } else {
           // Fetch existing activities from DB
+          console.log('No code found in URL. Fetching existing activities from DB.');
           data = await fetchActivitiesFromDB(token);
         }
 
         if (data.activities && data.activities.length > 0) {
           // Sort descending by start_date
+          console.log('Sorting activities by start_date.');
           const sortedActivities = data.activities.sort(
             (a, b) => new Date(b.start_date) - new Date(a.start_date)
           );
           setActivities(sortedActivities);
           setSummary(data.summary);
+          console.log('Activities and summary set in state.');
         } else {
           setActivities([]);
           setSummary({});
+          console.log('No activities found. State cleared.');
         }
       } catch (err) {
         setError(err.message);
@@ -95,20 +104,24 @@ const Dashboard = () => {
     const token = localStorage.getItem('jwt');
     if (!token) {
       setError('You must be logged in to refresh activities.');
+      console.error('No JWT token found. User must log in.');
       return;
     }
 
     try {
+      console.log('Refreshing activities with token:', token);
       const response = await axios.get('http://localhost:3001/activities/refresh', {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (response.data.activities) {
+        console.log('Activities refreshed:', response.data.activities);
         const sortedActivities = response.data.activities.sort(
           (a, b) => new Date(b.start_date) - new Date(a.start_date)
         );
         setActivities(sortedActivities);
         setSummary(response.data.summary);
         setCurrentPage(1); // Reset to first page
+        console.log('Activities and summary set in state after refresh.');
       }
     } catch (err) {
       console.error('Error refreshing activities:', err.message);
@@ -132,16 +145,19 @@ const Dashboard = () => {
   const goToNextPage = () => {
     if (currentPage < totalPages) {
       setCurrentPage(prev => prev + 1);
+      console.log('Navigated to next page:', currentPage + 1);
     }
   };
 
   const goToPrevPage = () => {
     if (currentPage > 1) {
       setCurrentPage(prev => prev - 1);
+      console.log('Navigated to previous page:', currentPage - 1);
     }
   };
 
   if (error) {
+    console.error('Error state detected:', error);
     return (
       <div style={{ color: 'red', textAlign: 'center', marginTop: '20px' }}>
         Error: {error}
@@ -150,6 +166,7 @@ const Dashboard = () => {
   }
 
   if (activities.length === 0 && !code) {
+    console.log('No activities found and no code in URL.');
     return (
       <div style={{ padding: '20px', textAlign: 'center' }}>
         <h1>Your Strava Activities Dashboard</h1>
@@ -159,6 +176,7 @@ const Dashboard = () => {
   }
 
   if (activities.length === 0 && code) {
+    console.log('Activities are loading...');
     return (
       <div style={{ textAlign: 'center', marginTop: '20px' }}>
         Loading data...
@@ -166,6 +184,7 @@ const Dashboard = () => {
     );
   }
 
+  console.log('Rendering activities and summary.');
   return (
     <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
       <h1 style={{ textAlign: 'center', marginBottom: '40px' }}>Your Strava Activities Dashboard</h1>
@@ -185,6 +204,7 @@ const Dashboard = () => {
           onChange={(e) => {
             setSearchTerm(e.target.value);
             setCurrentPage(1); // reset to first page if searching
+            console.log('Search term updated:', e.target.value);
           }}
           style={{ marginRight: '10px', padding: '6px' }}
         />
@@ -194,6 +214,7 @@ const Dashboard = () => {
           onChange={(e) => {
             setFilterType(e.target.value);
             setCurrentPage(1); // reset to first page if filtering
+            console.log('Filter type updated:', e.target.value);
           }}
           style={{ padding: '6px' }}
         >
