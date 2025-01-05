@@ -173,6 +173,10 @@ const Dashboard = () => {
   // Calculate runs and miles since January 1st, 2025
   const runsSince2025 = calculateRunsSinceDate(activities, new Date('2025-01-01'));
 
+  // Calculate progress for the New Year Goal
+  const goalMiles = 800;
+  const progressPercentage = Math.min((runsSince2025.totalMiles / goalMiles) * 100, 100);
+
   if (error) {
     console.error('Error state detected:', error);
     return (
@@ -203,13 +207,15 @@ const Dashboard = () => {
 
   console.log('Rendering activities and summary.');
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
-      <h1 style={{ textAlign: 'center', marginBottom: '40px' }}>Your Strava Activities Dashboard</h1>
+    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto', fontFamily: 'Arial, sans-serif', color: '#333' }}>
+      <h1 style={{ textAlign: 'center', marginBottom: '40px', fontSize: '2.5em', color: '#444' }}>Your Strava Activities Dashboard</h1>
 
       <div style={{ marginBottom: '20px', textAlign: 'center' }}>
         <button
           onClick={handleRefresh}
-          style={{ marginRight: '10px', padding: '8px 16px', cursor: 'pointer' }}
+          style={{ marginRight: '10px', padding: '8px 16px', cursor: 'pointer', borderRadius: '5px', border: '1px solid #ccc', backgroundColor: '#f0f0f0', transition: 'background-color 0.3s ease' }}
+          onMouseEnter={(e) => e.target.style.backgroundColor = '#ddd'}
+          onMouseLeave={(e) => e.target.style.backgroundColor = '#f0f0f0'}
         >
           Refresh Activities
         </button>
@@ -223,7 +229,7 @@ const Dashboard = () => {
             setCurrentPage(1); // reset to first page if searching
             console.log('Search term updated:', e.target.value);
           }}
-          style={{ marginRight: '10px', padding: '6px' }}
+          style={{ marginRight: '10px', padding: '6px', borderRadius: '5px', border: '1px solid #ccc' }}
         />
 
         <select
@@ -233,7 +239,7 @@ const Dashboard = () => {
             setCurrentPage(1); // reset to first page if filtering
             console.log('Filter type updated:', e.target.value);
           }}
-          style={{ padding: '6px' }}
+          style={{ padding: '6px', borderRadius: '5px', border: '1px solid #ccc' }}
         >
           <option value="">All Types</option>
           <option value="Run">Run</option>
@@ -255,12 +261,19 @@ const Dashboard = () => {
             <li key={type}>{type}: {summary.activityTypes[type]}</li>
           ))}
         </ul>
-        <h3>Runs Since January 1st, 2025:</h3>
-        <p><strong>Total Runs:</strong> {runsSince2025.totalRuns}</p>
-        <p><strong>Total Miles:</strong> {runsSince2025.totalMiles} miles</p>
       </div>
 
-      <h2 style={{ marginBottom: '20px' }}>Activities</h2>
+      <div style={{ marginBottom: '40px', backgroundColor: '#e0f7fa', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)' }}>
+        <h2 style={{ color: '#444' }}>New Year Goal</h2>
+        <p><strong>Total Runs:</strong> {runsSince2025.totalRuns}</p>
+        <p><strong>Total Miles:</strong> {runsSince2025.totalMiles} miles</p>
+        <div style={{ backgroundColor: '#ccc', borderRadius: '5px', overflow: 'hidden', marginTop: '10px' }}>
+          <div style={{ width: `${progressPercentage}%`, backgroundColor: '#76c7c0', height: '20px', transition: 'width 0.5s ease' }}></div>
+        </div>
+        <p style={{ textAlign: 'center', marginTop: '5px' }}>{progressPercentage.toFixed(2)}% of 800 miles goal</p>
+      </div>
+
+      <h2 style={{ marginBottom: '20px', fontSize: '2em', color: '#444' }}>Activities</h2>
       {currentActivities.map((activity) => (
         <div
           key={activity.activityId}
@@ -270,24 +283,43 @@ const Dashboard = () => {
             padding: '20px',
             marginBottom: '20px',
             backgroundColor: '#fff',
-            boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)'
+            boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+            transition: 'transform 0.3s ease',
+            cursor: 'pointer'
           }}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
         >
           <h3>{activity.name}</h3>
           <p><strong>Date:</strong> {new Date(activity.start_date).toLocaleString()}</p>
           <p><strong>Type:</strong> {activity.type}</p>
           <p><strong>Distance:</strong> {convertMetersToMiles(activity.distance)} miles</p>
+          <p><strong>Elevation Gain:</strong> {convertMetersToFeet(activity.total_elevation_gain)} feet</p>
+          <p><strong>Moving Time:</strong> {convertSecondsToHours(activity.moving_time)} hours</p>
+          <p><strong>Average Speed:</strong> {(activity.average_speed * 2.23694).toFixed(2)} mph</p>
+          <p><strong>Average Heart Rate:</strong> {activity.average_heartrate} bpm</p>
+          <p><strong>Location:</strong> {activity.location_city}, {activity.location_state}, {activity.location_country}</p>
+          <p><strong>Start Coordinates:</strong> {activity.start_lat}, {activity.start_lng}</p>
+          <p><strong>End Coordinates:</strong> {activity.end_lat}, {activity.end_lng}</p>
+          <p><strong>Visibility:</strong> {activity.visibility}</p>
+          <p><strong>Workout Type:</strong> {activity.workout_type}</p>
         </div>
       ))}
 
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
-        <button onClick={goToPrevPage} disabled={currentPage === 1} style={{ marginRight: '10px' }}>
+        <button onClick={goToPrevPage} disabled={currentPage === 1} style={{ marginRight: '10px', padding: '8px 16px', borderRadius: '5px', border: '1px solid #ccc', backgroundColor: '#f0f0f0', cursor: 'pointer', transition: 'background-color 0.3s ease' }}
+          onMouseEnter={(e) => e.target.style.backgroundColor = '#ddd'}
+          onMouseLeave={(e) => e.target.style.backgroundColor = '#f0f0f0'}
+        >
           Previous
         </button>
         <span style={{ fontSize: '1.2em', alignSelf:'center' }}>
           Page {currentPage} of {totalPages}
         </span>
-        <button onClick={goToNextPage} disabled={currentPage === totalPages} style={{ marginLeft: '10px' }}>
+        <button onClick={goToNextPage} disabled={currentPage === totalPages} style={{ marginLeft: '10px', padding: '8px 16px', borderRadius: '5px', border: '1px solid #ccc', backgroundColor: '#f0f0f0', cursor: 'pointer', transition: 'background-color 0.3s ease' }}
+          onMouseEnter={(e) => e.target.style.backgroundColor = '#ddd'}
+          onMouseLeave={(e) => e.target.style.backgroundColor = '#f0f0f0'}
+        >
           Next
         </button>
       </div>
