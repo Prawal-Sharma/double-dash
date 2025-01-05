@@ -298,11 +298,6 @@ const Dashboard = () => {
           <p><strong>Moving Time:</strong> {convertSecondsToHours(activity.moving_time)} hours</p>
           <p><strong>Average Speed:</strong> {(activity.average_speed * 2.23694).toFixed(2)} mph</p>
           <p><strong>Average Heart Rate:</strong> {activity.average_heartrate} bpm</p>
-          <p><strong>Location:</strong> {activity.location_city}, {activity.location_state}, {activity.location_country}</p>
-          <p><strong>Start Coordinates:</strong> {activity.start_lat}, {activity.start_lng}</p>
-          <p><strong>End Coordinates:</strong> {activity.end_lat}, {activity.end_lng}</p>
-          <p><strong>Visibility:</strong> {activity.visibility}</p>
-          <p><strong>Workout Type:</strong> {activity.workout_type}</p>
         </div>
       ))}
 
