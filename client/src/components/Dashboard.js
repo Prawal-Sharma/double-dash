@@ -156,6 +156,23 @@ const Dashboard = () => {
     }
   };
 
+  // Helper function to calculate runs and miles since a specific date
+  const calculateRunsSinceDate = (activities, startDate) => {
+    const filteredActivities = activities.filter(activity => 
+      activity.type === 'Run' && new Date(activity.start_date) >= startDate
+    );
+    const totalMiles = filteredActivities.reduce((sum, activity) => 
+      sum + parseFloat(convertMetersToMiles(activity.distance)), 0
+    );
+    return {
+      totalRuns: filteredActivities.length,
+      totalMiles: totalMiles.toFixed(2),
+    };
+  };
+
+  // Calculate runs and miles since January 1st, 2025
+  const runsSince2025 = calculateRunsSinceDate(activities, new Date('2025-01-01'));
+
   if (error) {
     console.error('Error state detected:', error);
     return (
@@ -238,6 +255,9 @@ const Dashboard = () => {
             <li key={type}>{type}: {summary.activityTypes[type]}</li>
           ))}
         </ul>
+        <h3>Runs Since January 1st, 2025:</h3>
+        <p><strong>Total Runs:</strong> {runsSince2025.totalRuns}</p>
+        <p><strong>Total Miles:</strong> {runsSince2025.totalMiles} miles</p>
       </div>
 
       <h2 style={{ marginBottom: '20px' }}>Activities</h2>
