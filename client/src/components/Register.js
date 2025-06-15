@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import config from '../config';
 
 const Register = () => {
   const [email, setEmail] = useState('');
@@ -11,7 +12,7 @@ const Register = () => {
 
   // Adjust clientID, redirectURI, and scope for Strava
   const clientID = '136786'; 
-  const redirectURI = 'http://localhost:3000/exchange_token';
+  const redirectURI = `${config.FRONTEND_URL}/exchange_token`;
   const scope = 'read,activity:read';
   const stravaAuthURL = `http://www.strava.com/oauth/authorize?client_id=${clientID}&response_type=code&redirect_uri=${redirectURI}&approval_prompt=force&scope=${scope}`;
 
@@ -24,7 +25,7 @@ const Register = () => {
     try {
       // First, register the user
       console.log('Attempting to register user...');
-      const registerResponse = await axios.post('http://localhost:3001/register', { email, password });
+      const registerResponse = await axios.post(`${config.API_BASE_URL}/register`, { email, password });
       console.log('Register response:', registerResponse.data);
 
       if (registerResponse.data.message === 'User registered successfully') {
@@ -32,7 +33,7 @@ const Register = () => {
         console.log('User registered successfully. Proceeding to login...');
 
         // Next, automatically login to get JWT
-        const loginResponse = await axios.post('http://localhost:3001/login', { email, password });
+        const loginResponse = await axios.post(`${config.API_BASE_URL}/login`, { email, password });
         console.log('Login response:', loginResponse.data);
         const { token } = loginResponse.data;
         // Store JWT in localStorage

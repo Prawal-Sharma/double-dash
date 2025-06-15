@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import config from '../config';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -14,7 +15,7 @@ const Login = () => {
     console.log('Attempting login with email:', email);
 
     try {
-      const response = await axios.post('http://localhost:3001/login', { email, password });
+      const response = await axios.post(`${config.API_BASE_URL}/login`, { email, password });
       console.log('Login successful, response:', response.data);
       const { token } = response.data;
       // Store JWT in localStorage

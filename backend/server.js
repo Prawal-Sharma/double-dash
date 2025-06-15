@@ -10,17 +10,30 @@ const { v4: uuidv4 } = require('uuid');
 const dynamoDB = require('./dynamodb');
 
 AWS.config.update({
-  region: 'us-east-1',
+  region: process.env.AWS_REGION || 'us-east-1',
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
 });
 
 const clientID = process.env.STRAVA_CLIENT_ID;
 const clientSecret = process.env.STRAVA_CLIENT_SECRET;
+const PORT = process.env.PORT || 3001;
 
 const app = express();
 app.use(bodyParser.json());
-app.use(cors());
+
+const allowedOrigins = process.env.NODE_ENV === 'production' 
+  ? ['https://doubledash.ai', 'https://www.doubledash.ai']
+  : ['http://localhost:3000'];
+
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
 
 // =====================
 // Authentication Helpers
@@ -547,6 +560,8 @@ app.get('/activities/refresh', authMiddleware, async (req, res) => {
 });
 
 // Start Express server without Apollo
-app.listen(3001, () => {
-  console.log('Server running on http://localhost:3001');
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Allowed origins: ${allowedOrigins.join(', ')}`);
 });

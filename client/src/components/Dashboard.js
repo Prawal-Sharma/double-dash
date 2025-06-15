@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useSearchParams, Link } from 'react-router-dom';
+import config from '../config';
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -28,7 +29,7 @@ const Dashboard = () => {
     const fetchActivitiesFromDB = async (token) => {
       console.log('Fetching activities from DB with token:', token);
       try {
-        const response = await axios.get('http://localhost:3001/activities', {
+        const response = await axios.get(`${config.API_BASE_URL}/activities`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         console.log('Activities fetched from DB:', response.data);
@@ -43,7 +44,7 @@ const Dashboard = () => {
       console.log('Exchanging token with Strava. Token:', token, 'Code:', code);
       try {
         const response = await axios.post(
-          'http://localhost:3001/exchange_token',
+          `${config.API_BASE_URL}/exchange_token`,
           { code },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -110,7 +111,7 @@ const Dashboard = () => {
 
     try {
       console.log('Refreshing activities with token:', token);
-      const response = await axios.get('http://localhost:3001/activities/refresh', {
+      const response = await axios.get(`${config.API_BASE_URL}/activities/refresh`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (response.data.activities) {
@@ -199,125 +200,292 @@ const Dashboard = () => {
   if (activities.length === 0 && code) {
     console.log('Activities are loading...');
     return (
-      <div style={{ textAlign: 'center', marginTop: '20px' }}>
-        Loading data...
+      <div style={{ padding: '20px', textAlign: 'center' }}>
+        <h1>Loading your activities...</h1>
+        <p>Please wait while we fetch your Strava data.</p>
       </div>
     );
   }
 
-  console.log('Rendering activities and summary.');
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto', fontFamily: 'Arial, sans-serif', color: '#333' }}>
-      <h1 style={{ textAlign: 'center', marginBottom: '40px', fontSize: '2.5em', color: '#444' }}>Your Strava Activities Dashboard</h1>
+    <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+      <h1 style={{ textAlign: 'center' }}>Your Strava Activities Dashboard</h1>
+      
+      {/* Summary Section */}
+      <div style={{ 
+        backgroundColor: '#f8f9fa', 
+        padding: '20px', 
+        borderRadius: '8px', 
+        marginBottom: '30px',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '15px'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <h3 style={{ margin: '0 0 10px 0' }}>Total Activities</h3>
+          <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0, color: '#007bff' }}>
+            {summary.totalActivities || 0}
+          </p>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <h3 style={{ margin: '0 0 10px 0' }}>Total Distance</h3>
+          <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0, color: '#28a745' }}>
+            {convertMetersToMiles(summary.totalDistance || 0)} miles
+          </p>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <h3 style={{ margin: '0 0 10px 0' }}>Total Elevation</h3>
+          <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0, color: '#ffc107' }}>
+            {convertMetersToFeet(summary.totalElevation || 0)} feet
+          </p>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <h3 style={{ margin: '0 0 10px 0' }}>Total Time</h3>
+          <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0, color: '#dc3545' }}>
+            {convertSecondsToHours(summary.totalMovingTime || 0)} hours
+          </p>
+        </div>
+      </div>
 
-      <div style={{ marginBottom: '20px', textAlign: 'center' }}>
-        <button
+      {/* New Year Goal Section */}
+      <div style={{ 
+        backgroundColor: '#e3f2fd', 
+        padding: '20px', 
+        borderRadius: '8px', 
+        marginBottom: '30px',
+        textAlign: 'center'
+      }}>
+        <h2 style={{ margin: '0 0 15px 0', color: '#1976d2' }}>🎯 2025 Goal: 800 Miles</h2>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
+          gap: '20px',
+          marginBottom: '15px'
+        }}>
+          <div>
+            <h4 style={{ margin: '0 0 5px 0' }}>Runs This Year</h4>
+            <p style={{ fontSize: '20px', fontWeight: 'bold', margin: 0, color: '#1976d2' }}>
+              {runsSince2025.totalRuns}
+            </p>
+          </div>
+          <div>
+            <h4 style={{ margin: '0 0 5px 0' }}>Miles This Year</h4>
+            <p style={{ fontSize: '20px', fontWeight: 'bold', margin: 0, color: '#1976d2' }}>
+              {runsSince2025.totalMiles}
+            </p>
+          </div>
+          <div>
+            <h4 style={{ margin: '0 0 5px 0' }}>Remaining</h4>
+            <p style={{ fontSize: '20px', fontWeight: 'bold', margin: 0, color: '#1976d2' }}>
+              {Math.max(0, goalMiles - runsSince2025.totalMiles).toFixed(2)} miles
+            </p>
+          </div>
+        </div>
+        <div style={{ 
+          backgroundColor: '#ffffff', 
+          borderRadius: '10px', 
+          height: '20px', 
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          <div style={{ 
+            backgroundColor: '#4caf50', 
+            height: '100%', 
+            width: `${progressPercentage}%`,
+            transition: 'width 0.3s ease'
+          }} />
+          <div style={{ 
+            position: 'absolute', 
+            top: '50%', 
+            left: '50%', 
+            transform: 'translate(-50%, -50%)',
+            fontWeight: 'bold',
+            fontSize: '12px'
+          }}>
+            {progressPercentage.toFixed(1)}%
+          </div>
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: '20px',
+        flexWrap: 'wrap',
+        gap: '10px'
+      }}>
+        <button 
           onClick={handleRefresh}
-          style={{ marginRight: '10px', padding: '8px 16px', cursor: 'pointer', borderRadius: '5px', border: '1px solid #ccc', backgroundColor: '#f0f0f0', transition: 'background-color 0.3s ease' }}
-          onMouseEnter={(e) => e.target.style.backgroundColor = '#ddd'}
-          onMouseLeave={(e) => e.target.style.backgroundColor = '#f0f0f0'}
+          style={{ 
+            padding: '10px 20px', 
+            backgroundColor: '#007bff', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '5px',
+            cursor: 'pointer',
+            fontSize: '16px'
+          }}
         >
-          Refresh Activities
+          🔄 Refresh Activities
         </button>
-
-        <input
-          type="text"
-          placeholder="Search by name..."
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setCurrentPage(1); // reset to first page if searching
-            console.log('Search term updated:', e.target.value);
-          }}
-          style={{ marginRight: '10px', padding: '6px', borderRadius: '5px', border: '1px solid #ccc' }}
-        />
-
-        <select
-          value={filterType}
-          onChange={(e) => {
-            setFilterType(e.target.value);
-            setCurrentPage(1); // reset to first page if filtering
-            console.log('Filter type updated:', e.target.value);
-          }}
-          style={{ padding: '6px', borderRadius: '5px', border: '1px solid #ccc' }}
-        >
-          <option value="">All Types</option>
-          <option value="Run">Run</option>
-          <option value="Ride">Ride</option>
-          <option value="Walk">Walk</option>
-          {/* Add more if desired */}
-        </select>
-      </div>
-
-      <div style={{ marginBottom: '40px', backgroundColor: '#f9f9f9', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)' }}>
-        <h2>Summary</h2>
-        <p><strong>Total Activities:</strong> {summary.totalActivities}</p>
-        <p><strong>Total Distance:</strong> {convertMetersToMiles(summary.totalDistance)} miles</p>
-        <p><strong>Total Elevation Gain:</strong> {convertMetersToFeet(summary.totalElevation)} feet</p>
-        <p><strong>Total Moving Time:</strong> {convertSecondsToHours(summary.totalMovingTime)} hours</p>
-        <h3>Activities by Type:</h3>
-        <ul>
-          {summary.activityTypes && Object.keys(summary.activityTypes).map(type => (
-            <li key={type}>{type}: {summary.activityTypes[type]}</li>
-          ))}
-        </ul>
-      </div>
-
-      <div style={{ marginBottom: '40px', backgroundColor: '#e0f7fa', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)' }}>
-        <h2 style={{ color: '#444' }}>New Year Goal</h2>
-        <p><strong>Total Runs:</strong> {runsSince2025.totalRuns}</p>
-        <p><strong>Total Miles:</strong> {runsSince2025.totalMiles} miles</p>
-        <div style={{ backgroundColor: '#ccc', borderRadius: '5px', overflow: 'hidden', marginTop: '10px' }}>
-          <div style={{ width: `${progressPercentage}%`, backgroundColor: '#76c7c0', height: '20px', transition: 'width 0.5s ease' }}></div>
+        
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <input
+            type="text"
+            placeholder="Search activities..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ 
+              padding: '8px 12px', 
+              border: '1px solid #ddd', 
+              borderRadius: '4px', 
+              fontSize: '14px',
+              minWidth: '200px'
+            }}
+          />
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            style={{ 
+              padding: '8px 12px', 
+              border: '1px solid #ddd', 
+              borderRadius: '4px', 
+              fontSize: '14px'
+            }}
+          >
+            <option value="">All Types</option>
+            <option value="Run">Run</option>
+            <option value="Ride">Ride</option>
+            <option value="Walk">Walk</option>
+          </select>
         </div>
-        <p style={{ textAlign: 'center', marginTop: '5px' }}>{progressPercentage.toFixed(2)}% of 800 miles goal</p>
       </div>
 
-      <h2 style={{ marginBottom: '20px', fontSize: '2em', color: '#444' }}>Activities</h2>
-      {currentActivities.map((activity) => (
-        <div
-          key={activity.activityId}
-          style={{
-            border: '1px solid #ddd',
-            borderRadius: '10px',
-            padding: '20px',
-            marginBottom: '20px',
-            backgroundColor: '#fff',
-            boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-            transition: 'transform 0.3s ease',
-            cursor: 'pointer'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-        >
-          <h3>{activity.name}</h3>
-          <p><strong>Date:</strong> {new Date(activity.start_date).toLocaleString()}</p>
-          <p><strong>Type:</strong> {activity.type}</p>
-          <p><strong>Distance:</strong> {convertMetersToMiles(activity.distance)} miles</p>
-          <p><strong>Elevation Gain:</strong> {convertMetersToFeet(activity.total_elevation_gain)} feet</p>
-          <p><strong>Moving Time:</strong> {convertSecondsToHours(activity.moving_time)} hours</p>
-          <p><strong>Average Speed:</strong> {(activity.average_speed * 2.23694).toFixed(2)} mph</p>
-          <p><strong>Average Heart Rate:</strong> {activity.average_heartrate} bpm</p>
+      {/* Activities List */}
+      <div style={{ 
+        display: 'grid', 
+        gap: '15px', 
+        marginBottom: '30px' 
+      }}>
+        {currentActivities.map((activity, index) => (
+          <div key={activity.activityId || index} style={{ 
+            border: '1px solid #ddd', 
+            borderRadius: '8px', 
+            padding: '15px',
+            backgroundColor: '#ffffff',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'flex-start',
+              marginBottom: '10px'
+            }}>
+              <div style={{ flex: 1 }}>
+                <h3 style={{ margin: '0 0 5px 0', color: '#333' }}>
+                  {activity.name}
+                </h3>
+                <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>
+                  {new Date(activity.start_date).toLocaleDateString()} • {activity.type}
+                </p>
+              </div>
+              <div style={{ 
+                backgroundColor: activity.type === 'Run' ? '#28a745' : '#6c757d',
+                color: 'white',
+                padding: '4px 8px',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: 'bold'
+              }}>
+                {activity.type}
+              </div>
+            </div>
+            
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', 
+              gap: '10px',
+              fontSize: '14px'
+            }}>
+              <div>
+                <strong>Distance:</strong><br />
+                {convertMetersToMiles(activity.distance)} miles
+              </div>
+              <div>
+                <strong>Time:</strong><br />
+                {Math.floor(activity.moving_time / 3600)}h {Math.floor((activity.moving_time % 3600) / 60)}m
+              </div>
+              <div>
+                <strong>Elevation:</strong><br />
+                {convertMetersToFeet(activity.total_elevation_gain)} ft
+              </div>
+              {activity.average_speed && (
+                <div>
+                  <strong>Avg Speed:</strong><br />
+                  {(activity.average_speed * 2.237).toFixed(1)} mph
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          gap: '10px',
+          marginTop: '20px'
+        }}>
+          <button 
+            onClick={goToPrevPage} 
+            disabled={currentPage === 1}
+            style={{ 
+              padding: '8px 16px', 
+              border: '1px solid #ddd', 
+              borderRadius: '4px',
+              backgroundColor: currentPage === 1 ? '#f8f9fa' : '#ffffff',
+              cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+              opacity: currentPage === 1 ? 0.6 : 1
+            }}
+          >
+            Previous
+          </button>
+          
+          <span style={{ 
+            padding: '8px 16px', 
+            fontSize: '16px',
+            fontWeight: 'bold'
+          }}>
+            Page {currentPage} of {totalPages}
+          </span>
+          
+          <button 
+            onClick={goToNextPage} 
+            disabled={currentPage === totalPages}
+            style={{ 
+              padding: '8px 16px', 
+              border: '1px solid #ddd', 
+              borderRadius: '4px',
+              backgroundColor: currentPage === totalPages ? '#f8f9fa' : '#ffffff',
+              cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+              opacity: currentPage === totalPages ? 0.6 : 1
+            }}
+          >
+            Next
+          </button>
         </div>
-      ))}
+      )}
 
-      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
-        <button onClick={goToPrevPage} disabled={currentPage === 1} style={{ marginRight: '10px', padding: '8px 16px', borderRadius: '5px', border: '1px solid #ccc', backgroundColor: '#f0f0f0', cursor: 'pointer', transition: 'background-color 0.3s ease' }}
-          onMouseEnter={(e) => e.target.style.backgroundColor = '#ddd'}
-          onMouseLeave={(e) => e.target.style.backgroundColor = '#f0f0f0'}
-        >
-          Previous
-        </button>
-        <span style={{ fontSize: '1.2em', alignSelf:'center' }}>
-          Page {currentPage} of {totalPages}
-        </span>
-        <button onClick={goToNextPage} disabled={currentPage === totalPages} style={{ marginLeft: '10px', padding: '8px 16px', borderRadius: '5px', border: '1px solid #ccc', backgroundColor: '#f0f0f0', cursor: 'pointer', transition: 'background-color 0.3s ease' }}
-          onMouseEnter={(e) => e.target.style.backgroundColor = '#ddd'}
-          onMouseLeave={(e) => e.target.style.backgroundColor = '#f0f0f0'}
-        >
-          Next
-        </button>
-      </div>
+      {filteredActivities.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+          <p>No activities match your search criteria.</p>
+        </div>
+      )}
     </div>
   );
 };
