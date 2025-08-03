@@ -1,0 +1,13 @@
+node_modules/
+.env*
+*.log
+.DS_Store
+.git/
+.gitignore
+README.md
+*.zip
+debug-*.js
+test-*.js
+minimal-*.js
+ultra-minimal-*.js
+*.md

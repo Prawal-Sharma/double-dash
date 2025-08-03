@@ -17,6 +17,11 @@ const { testConnection } = require('./config/database');
 
 const app = express();
 
+// Trust proxy for Elastic Beanstalk load balancer
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Security middleware
 // app.use(helmet({ // TEMPORARILY DISABLED FOR DEBUGGING
 //   crossOriginEmbedderPolicy: false,

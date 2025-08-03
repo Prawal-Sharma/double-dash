@@ -73,29 +73,68 @@ cd ../backend
 export AWS_PROFILE=doubledash-deploy
 ```
 
-#### Create Application Bundle
+#### Important: Clean Install Dependencies
 ```bash
+# Remove local node_modules to prevent bcrypt binding issues
+rm -rf node_modules
+npm install --production
+```
+
+#### Deploy with EB CLI (Recommended)
+```bash
+# Deploy using Elastic Beanstalk CLI
+AWS_PROFILE=doubledash-deploy eb deploy
+```
+
+#### Alternative: Manual Deploy Process
+```bash
+# Create Application Bundle (if EB CLI unavailable)
 zip -r doubledash-backend.zip . -x "node_modules/*" ".git/*" "*.zip" ".env"
-```
 
-#### Upload to S3
-```bash
+# Upload to S3
 aws s3 cp doubledash-backend.zip s3://elasticbeanstalk-us-west-2-872515281428/doubledash-backend-v1.0.zip
-```
 
-#### Create Application Version
-```bash
+# Create Application Version
 aws elasticbeanstalk create-application-version \
   --application-name doubledash-api \
   --version-label v1.0 \
   --source-bundle S3Bucket=elasticbeanstalk-us-west-2-872515281428,S3Key=doubledash-backend-v1.0.zip
-```
 
-#### Deploy to Environment
-```bash
+# Deploy to Environment
 aws elasticbeanstalk update-environment \
   --environment-name doubledash-production \
   --version-label v1.0
+```
+
+#### Backend Configuration Files
+
+Create `.ebignore` to exclude problematic files:
+```
+node_modules/
+.env*
+*.log
+.DS_Store
+.git/
+.gitignore
+README.md
+*.zip
+debug-*.js
+test-*.js
+minimal-*.js
+ultra-minimal-*.js
+*.md
+```
+
+Configure `.elasticbeanstalk/config.yml`:
+```yaml
+branch-defaults:
+  default:
+    environment: doubledash-production
+global:
+  application_name: doubledash-api
+  default_platform: Node.js 18 running on 64bit Amazon Linux 2023
+  default_region: us-west-2
+  profile: doubledash-deploy
 ```
 
 **Verify Deployment:**
@@ -111,16 +150,22 @@ curl http://doubledash-api.us-west-2.elasticbeanstalk.com/health
 Set the following environment variables in Elastic Beanstalk:
 
 ```bash
-aws elasticbeanstalk update-environment \
+# Set all environment variables at once
+AWS_PROFILE=doubledash-deploy aws elasticbeanstalk update-environment \
   --environment-name doubledash-production \
   --option-settings \
     Namespace=aws:elasticbeanstalk:application:environment,OptionName=NODE_ENV,Value=production \
     Namespace=aws:elasticbeanstalk:application:environment,OptionName=PORT,Value=8080 \
-    Namespace=aws:elasticbeanstalk:application:environment,OptionName=STRAVA_CLIENT_ID,Value=[YOUR_STRAVA_CLIENT_ID] \
-    Namespace=aws:elasticbeanstalk:application:environment,OptionName=STRAVA_CLIENT_SECRET,Value=[YOUR_STRAVA_CLIENT_SECRET] \
-    Namespace=aws:elasticbeanstalk:application:environment,OptionName=JWT_SECRET,Value=[YOUR_JWT_SECRET] \
-    Namespace=aws:elasticbeanstalk:application:environment,OptionName=JWT_REFRESH_SECRET,Value=[YOUR_JWT_REFRESH_SECRET] \
+    Namespace=aws:elasticbeanstalk:application:environment,OptionName=STRAVA_CLIENT_ID,Value="[YOUR_STRAVA_CLIENT_ID]" \
+    Namespace=aws:elasticbeanstalk:application:environment,OptionName=STRAVA_CLIENT_SECRET,Value="[YOUR_STRAVA_CLIENT_SECRET]" \
+    Namespace=aws:elasticbeanstalk:application:environment,OptionName=JWT_SECRET,Value="[YOUR_JWT_SECRET]" \
+    Namespace=aws:elasticbeanstalk:application:environment,OptionName=JWT_REFRESH_SECRET,Value="[YOUR_JWT_REFRESH_SECRET]" \
     Namespace=aws:elasticbeanstalk:application:environment,OptionName=AWS_REGION,Value=us-west-2
+
+# Verify environment variables are set
+AWS_PROFILE=doubledash-deploy aws elasticbeanstalk describe-configuration-settings \
+  --environment-name doubledash-production \
+  --query 'ConfigurationSettings[0].OptionSettings[?Namespace==`aws:elasticbeanstalk:application:environment`]'
 ```
 
 **Generate JWT Secrets:**
@@ -245,23 +290,41 @@ aws elasticbeanstalk update-environment \
 
 ### Common Issues
 
-#### 1. CORS Errors
+#### 1. bcrypt Binding Errors (Fixed)
+**Problem**: `Error: /var/app/current/node_modules/bcrypt/lib/binding/napi-v3/bcrypt_lib.node: invalid ELF header`
+**Solution**: 
+- Exclude `node_modules/` in `.ebignore`
+- Run `rm -rf node_modules && npm install --production` before deploy
+- Let Elastic Beanstalk install dependencies on target platform
+
+#### 2. Trust Proxy Errors (Fixed)
+**Problem**: `ValidationError: The 'X-Forwarded-For' header is set but the Express 'trust proxy' setting is false`
+**Solution**: Added `app.set('trust proxy', 1)` in production mode in `app.js`
+
+#### 3. Token Exchange Race Conditions (Fixed)
+**Problem**: "Failed to exchange Strava token" errors during registration
+**Solution**: Implemented session storage-based request deduplication with caching
+
+#### 4. CORS Errors
 - Verify `allowedOrigins` in backend includes frontend domain
 - Check preflight OPTIONS requests
 
-#### 2. Environment Variables Not Set
+#### 5. Environment Variables Not Set
 ```bash
-aws elasticbeanstalk describe-configuration-settings \
+AWS_PROFILE=doubledash-deploy aws elasticbeanstalk describe-configuration-settings \
   --environment-name doubledash-production \
   --query 'ConfigurationSettings[0].OptionSettings[?Namespace==`aws:elasticbeanstalk:application:environment`]'
 ```
 
-#### 3. Deployment Failures
+#### 6. Deployment Failures
 ```bash
 # Check deployment events
-aws elasticbeanstalk describe-events \
+AWS_PROFILE=doubledash-deploy aws elasticbeanstalk describe-events \
   --environment-name doubledash-production \
   --max-records 10
+
+# View detailed logs
+AWS_PROFILE=doubledash-deploy eb logs --all
 ```
 
 ### Getting Help
@@ -273,6 +336,28 @@ aws elasticbeanstalk describe-events \
 
 ---
 
-**Last Updated**: August 2025  
-**Deployed Version**: v1.0  
+## Recent Updates (August 2025)
+
+### UX Improvements Deployed
+- **Race Condition Fixes**: Session storage-based request deduplication for token exchange
+- **Enhanced Error Handling**: User-friendly error messages for various failure scenarios
+- **Progressive Loading**: Optimistic UI updates with cached data for faster perceived performance
+- **Trust Proxy Configuration**: Fixed rate limiting issues in Elastic Beanstalk environment
+
+### Infrastructure Improvements
+- Fixed bcrypt binding issues with proper .ebignore configuration
+- Enhanced deployment process with EB CLI integration
+- Improved error logging and monitoring capabilities
+- Updated environment variable management procedures
+
+### Security & Performance
+- Implemented session-based caching for API responses
+- Added comprehensive error boundaries for better user experience
+- Enhanced CORS configuration for production environment
+- Improved token exchange flow with race condition prevention
+
+---
+
+**Last Updated**: August 3, 2025  
+**Deployed Version**: Latest (with UX improvements)  
 **Maintainer**: Development Team
