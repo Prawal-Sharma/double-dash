@@ -10,11 +10,26 @@ class StravaAPI {
     try {
       console.log('Attempting Strava token exchange with code:', code?.substring(0, 10) + '...');
       
+      // Validate inputs
+      if (!code) {
+        throw new Error('Authorization code is required');
+      }
+      
+      if (!process.env.STRAVA_CLIENT_ID || !process.env.STRAVA_CLIENT_SECRET) {
+        throw new Error('Strava client credentials not configured');
+      }
+      
       const response = await axios.post(this.oauthURL, {
         client_id: process.env.STRAVA_CLIENT_ID,
         client_secret: process.env.STRAVA_CLIENT_SECRET,
         code: code,
         grant_type: 'authorization_code',
+      }, {
+        timeout: 30000, // 30 second timeout
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
       });
 
       console.log('Strava token exchange successful');
@@ -24,12 +39,35 @@ class StravaAPI {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
-        message: error.message
+        message: error.message,
+        code: error.code
       });
       
+      // Handle specific error cases
       if (error.response?.status === 400) {
-        const errorMsg = error.response?.data?.message || 'Invalid authorization code';
-        throw new Error(`Strava authorization failed: ${errorMsg}. The authorization code may have expired or already been used.`);
+        const errorData = error.response?.data;
+        const errorMsg = errorData?.message || errorData?.errors?.[0]?.code || 'Invalid authorization code';
+        
+        // Check for specific error types
+        if (errorMsg.includes('invalid') || errorMsg.includes('expired')) {
+          throw new Error(`Authorization code is invalid or expired. Please try authorizing again.`);
+        } else if (errorMsg.includes('used')) {
+          throw new Error(`Authorization code has already been used. Please try authorizing again.`);
+        } else {
+          throw new Error(`Strava authorization failed: ${errorMsg}`);
+        }
+      }
+      
+      if (error.response?.status === 429) {
+        throw new Error('Too many requests to Strava. Please wait a moment and try again.');
+      }
+      
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        throw new Error('Connection to Strava timed out. Please try again.');
+      }
+      
+      if (error.response?.status >= 500) {
+        throw new Error('Strava service is temporarily unavailable. Please try again later.');
       }
       
       throw new Error(`Strava token exchange failed: ${error.response?.data?.message || error.message}`);

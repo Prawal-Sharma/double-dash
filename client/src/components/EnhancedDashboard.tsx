@@ -125,7 +125,7 @@ const EnhancedDashboard: React.FC = () => {
     message: string;
   } | null>(null);
   const [autoSyncing, setAutoSyncing] = useState<boolean>(false);
-  const [tokenExchangeInProgress, setTokenExchangeInProgress] = useState<boolean>(false);
+  const [processingStep, setProcessingStep] = useState<'idle' | 'token-exchange' | 'sync-check' | 'loading-data'>('idle');
 
   const code: string | null = searchParams.get('code');
 
@@ -155,34 +155,106 @@ const EnhancedDashboard: React.FC = () => {
       }
     };
 
-    const exchangeTokenAndFetch = async (token: string, code: string): Promise<ActivitiesResponse> => {
-      // Prevent multiple simultaneous token exchanges
-      if (tokenExchangeInProgress) {
-        throw new Error('Token exchange already in progress');
+    const handleTokenExchange = async (token: string, code: string): Promise<ActivitiesResponse | null> => {
+      const cacheKey = `strava-exchange-${code}`;
+      const processingKey = `processing-${code}`;
+      const timestampKey = `exchange-timestamp-${code}`;
+      
+      // Check if this code was already successfully processed
+      const cachedResult = sessionStorage.getItem(cacheKey);
+      if (cachedResult) {
+        console.log('Using cached token exchange result');
+        // Clear URL immediately when using cached result
+        navigate('/dashboard', { replace: true });
+        return JSON.parse(cachedResult);
+      }
+      
+      // Check if this code is currently being processed
+      if (sessionStorage.getItem(processingKey)) {
+        console.log('Token exchange already in progress, skipping duplicate request');
+        // Clear URL to prevent multiple attempts
+        navigate('/dashboard', { replace: true });
+        return null;
+      }
+      
+      // Check if this code was recently attempted (within 30 seconds) to prevent spam
+      const lastAttempt = sessionStorage.getItem(timestampKey);
+      if (lastAttempt && (Date.now() - parseInt(lastAttempt)) < 30000) {
+        console.log('Recent token exchange attempt detected, skipping to prevent rate limiting');
+        navigate('/dashboard', { replace: true });
+        setError('Please wait a moment before trying again.');
+        return null;
       }
       
       try {
-        setTokenExchangeInProgress(true);
+        // Mark as processing immediately
+        sessionStorage.setItem(processingKey, 'true');
+        sessionStorage.setItem(timestampKey, Date.now().toString());
+        setProcessingStep('token-exchange');
+        
+        // Clear the code from URL immediately to prevent re-execution
+        navigate('/dashboard', { replace: true });
+        
+        console.log('Starting Strava token exchange...');
         const response = await axios.post<ActivitiesResponse>(
           `${config.API_BASE_URL}/api/strava/exchange_token`,
           { code },
-          { headers: { Authorization: `Bearer ${token}` } }
+          { 
+            headers: { Authorization: `Bearer ${token}` },
+            timeout: 30000 // 30 second timeout
+          }
         );
         
-        // Clear the code from URL after successful exchange
-        navigate('/dashboard', { replace: true });
+        console.log('Token exchange successful, caching result');
+        // Cache the successful result
+        sessionStorage.setItem(cacheKey, JSON.stringify(response.data));
+        
+        // Clean up all related cache keys after successful exchange
+        setTimeout(() => {
+          sessionStorage.removeItem(cacheKey);
+          sessionStorage.removeItem(timestampKey);
+        }, 5 * 60 * 1000); // Clean up after 5 minutes
         
         return response.data;
       } catch (err: any) {
-        // Check if this is a Strava authorization error
-        if (err.response?.status === 400 || err.response?.status === 401) {
-          // Redirect to auth failure page for user-friendly error handling
-          navigate('/auth-failure');
-          throw new Error('Strava authorization failed');
+        console.error('Token exchange failed:', err);
+        
+        // Check if this is a Strava authorization error (code already used)
+        if (err.response?.status === 400) {
+          const errorMsg = err.response?.data?.message || '';
+          if (errorMsg.includes('invalid') || errorMsg.includes('expired') || errorMsg.includes('used')) {
+            setError('This authorization link has already been used or expired. Please register again to get a fresh link.');
+          } else {
+            setError('Authorization failed. Please try registering again.');
+          }
+          return null;
         }
-        throw new Error('Failed to exchange Strava token');
+        
+        // Check for unauthorized access
+        if (err.response?.status === 401) {
+          setError('Authentication failed. Please log in again and retry.');
+          return null;
+        }
+        
+        // Check for rate limiting
+        if (err.response?.status === 429) {
+          setError('Too many requests. Please wait a moment and try again.');
+          return null;
+        }
+        
+        // Network or timeout errors
+        if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
+          setError('Connection timeout. Please check your internet and try again.');
+          return null;
+        }
+        
+        // Generic error
+        setError('Connection failed. Please refresh the page and try again.');
+        return null;
       } finally {
-        setTokenExchangeInProgress(false);
+        // Clean up processing flag
+        sessionStorage.removeItem(processingKey);
+        setProcessingStep('idle');
       }
     };
 
@@ -199,101 +271,128 @@ const EnhancedDashboard: React.FC = () => {
       }
     };
 
-    const performAutoSync = async (token: string) => {
-      try {
-        setAutoSyncing(true);
-        const response = await axios.post(`${config.API_BASE_URL}/api/strava/auto-sync`, {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        if (response.data.synced !== false) {
-          // Auto-sync actually performed, update activities
-          if (response.data.activities) {
-            const sortedActivities = response.data.activities.sort(
-              (a: Activity, b: Activity) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
-            );
-            setActivities(sortedActivities);
-            setSummary(response.data.summary);
-            setLastSyncTime(new Date(response.data.lastSyncTime));
-          }
-        }
-        
-        return response.data;
-      } catch (err) {
-        console.error('Auto-sync failed:', err);
-        return null;
-      } finally {
-        setAutoSyncing(false);
-      }
-    };
+    // Auto-sync function (currently unused but may be needed later)
+    // const performAutoSync = async (token: string) => {
+    //   try {
+    //     setAutoSyncing(true);
+    //     const response = await axios.post(`${config.API_BASE_URL}/api/strava/auto-sync`, {}, {
+    //       headers: { Authorization: `Bearer ${token}` }
+    //     });
+    //     
+    //     if (response.data.synced !== false) {
+    //       // Auto-sync actually performed, update activities
+    //       if (response.data.activities) {
+    //         const sortedActivities = response.data.activities.sort(
+    //           (a: Activity, b: Activity) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
+    //         );
+    //         setActivities(sortedActivities);
+    //         setSummary(response.data.summary);
+    //         setLastSyncTime(new Date(response.data.lastSyncTime));
+    //       }
+    //     }
+    //     
+    //     return response.data;
+    //   } catch (err) {
+    //     console.error('Auto-sync failed:', err);
+    //     return null;
+    //   } finally {
+    //     setAutoSyncing(false);
+    //   }
+    // };
 
-    const fetchData = async () => {
+    const loadDashboard = async () => {
       setLoading(true);
+      setError(null);
       const token = localStorage.getItem('jwt');
       
       if (!token) {
-        setError('You must be logged in to view the dashboard.');
+        setError('Please log in to view your dashboard.');
         setLoading(false);
         return;
       }
 
       try {
-        let data;
+        let data: ActivitiesResponse | null = null;
+        
+        // Step 1: Handle token exchange if code is present
         if (code) {
-          data = await exchangeTokenAndFetch(token, code);
-        } else {
-          // Check sync status first (this tells us if Strava is connected)
-          const syncStatusData = await checkSyncStatus(token);
+          console.log('Dashboard loading with Strava authorization code');
+          data = await handleTokenExchange(token, code);
+          if (!data) {
+            // Token exchange failed or was skipped - don't show loading anymore
+            setLoading(false);
+            return;
+          }
           
-          if (syncStatusData && syncStatusData.connected) {
-            // Only try auto-sync if Strava is connected
-            const autoSyncData = await performAutoSync(token);
+          // Token exchange successful - update UI immediately
+          if (data.activities && data.activities.length > 0) {
+            const sortedActivities = data.activities.sort(
+              (a: Activity, b: Activity) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
+            );
+            setActivities(sortedActivities);
+            setSummary(data.summary);
+            setLastSyncTime(data.lastSyncTime ? new Date(data.lastSyncTime) : new Date());
+            console.log(`Successfully loaded ${sortedActivities.length} activities from token exchange`);
+          }
+        } else {
+          // Step 2: Normal dashboard load - optimistic loading
+          setProcessingStep('sync-check');
+          console.log('Dashboard loading in normal mode');
+          
+          try {
+            // First, try to get existing data from database quickly
+            data = await fetchActivitiesFromDB(token);
             
-            if (autoSyncData && autoSyncData.synced !== false) {
-              // Use auto-sync data if it performed a sync
-              data = autoSyncData;
-            } else {
-              // Fall back to regular database fetch
-              data = await fetchActivitiesFromDB(token);
-            }
-          } else {
-            // No Strava connection, just fetch from database
-            try {
-              data = await fetchActivitiesFromDB(token);
-            } catch (dbErr) {
-              // If no data in database and no Strava connection, show welcome message
-              setActivities([]);
-              setSummary({} as ActivitySummary);
-              setLastSyncTime(new Date());
-              setError('No Strava connection found. Please register and connect your Strava account to see your activities.');
+            // Update UI immediately with existing data (optimistic loading)
+            if (data && data.activities && data.activities.length > 0) {
+              const sortedActivities = data.activities.sort(
+                (a: Activity, b: Activity) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
+              );
+              setActivities(sortedActivities);
+              setSummary(data.summary);
+              setLastSyncTime(data.lastSyncTime ? new Date(data.lastSyncTime) : new Date());
+              console.log(`Loaded ${sortedActivities.length} cached activities from database`);
+              
+              // Stop loading since we have data to show
               setLoading(false);
-              return;
+              setProcessingStep('idle');
+              
+              // Then check sync status in background (non-blocking)
+              checkSyncStatus(token).then(syncStatusData => {
+                if (syncStatusData && syncStatusData.connected && syncStatusData.needsSync) {
+                  setSyncStatus(syncStatusData);
+                  console.log('Sync status: New data available');
+                } else if (syncStatusData) {
+                  setSyncStatus(syncStatusData);
+                  console.log('Sync status: Up to date');
+                }
+              }).catch(err => {
+                console.warn('Background sync status check failed:', err);
+              });
+              
+              return; // Exit early since we have data
             }
+            
+          } catch (dbErr) {
+            console.log('No cached activities found, showing onboarding');
+            // No data in database - show onboarding message
+            setActivities([]);
+            setSummary({} as ActivitySummary);
+            setError('Welcome to DoubleDash! Connect your Strava account to get started.');
           }
         }
-
-        if (data && data.activities && data.activities.length > 0) {
-          const sortedActivities = data.activities.sort(
-            (a: Activity, b: Activity) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
-          );
-          setActivities(sortedActivities);
-          setSummary(data.summary);
-          setLastSyncTime(data.lastSyncTime ? new Date(data.lastSyncTime) : new Date());
-        } else {
-          setActivities([]);
-          setSummary({} as ActivitySummary);
-          setLastSyncTime(new Date());
-        }
+        
       } catch (err) {
-        console.error('Dashboard fetch error:', err);
-        setError(err instanceof Error ? err.message : 'An error occurred');
+        console.error('Dashboard load error:', err);
+        setError('Unable to load dashboard. Please refresh the page to try again.');
       } finally {
         setLoading(false);
+        setProcessingStep('idle');
       }
     };
 
-    fetchData();
-  }, [code]); // Only re-run when code changes
+    loadDashboard();
+  }, [code, navigate]); // Only re-run when code or navigate changes
 
   const handleRefresh = async () => {
     setLoading(true);
@@ -343,14 +442,22 @@ const EnhancedDashboard: React.FC = () => {
     );
   }
 
-  if (loading) {
+  if (loading && activities.length === 0) {
     return (
       <ThemeProvider theme={isDarkMode ? darkTheme : lightTheme}>
         <Container>
           <LoadingContainer>
             <LoadingSpinner />
-            <Heading size="md">Loading Your Analytics...</Heading>
-            <Text>Crunching your running data</Text>
+            <Heading size="md">
+              {processingStep === 'token-exchange' ? 'Connecting to Strava...' :
+               processingStep === 'sync-check' ? 'Loading Your Dashboard...' :
+               'Loading Your Analytics...'}
+            </Heading>
+            <Text>
+              {processingStep === 'token-exchange' ? 'Setting up your account with Strava' :
+               processingStep === 'sync-check' ? 'Getting your latest activities' :
+               'Crunching your running data'}
+            </Text>
           </LoadingContainer>
         </Container>
       </ThemeProvider>
@@ -391,11 +498,13 @@ const EnhancedDashboard: React.FC = () => {
               <FlexContainer gap="sm" align="center">
                 <Button 
                   onClick={handleRefresh}
-                  disabled={loading || autoSyncing}
+                  disabled={loading || autoSyncing || processingStep !== 'idle'}
                   variant="primary"
                   size="sm"
                 >
-                  {loading ? '⏳ Syncing...' : 
+                  {processingStep === 'token-exchange' ? '🔗 Connecting to Strava...' :
+                   processingStep === 'sync-check' ? '🔍 Checking for updates...' :
+                   loading ? '⏳ Syncing...' : 
                    autoSyncing ? '🔄 Auto-syncing...' : 
                    '🔄 Sync Strava'}
                 </Button>

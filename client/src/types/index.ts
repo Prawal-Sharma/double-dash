@@ -100,6 +100,8 @@ export interface ActivitiesResponse {
   activities: Activity[];
   summary: ActivitySummary;
   message?: string;
+  lastSyncTime?: string;
+  synced?: boolean;
 }
 
 // Form data types
