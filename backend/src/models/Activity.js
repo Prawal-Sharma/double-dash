@@ -88,6 +88,33 @@ class Activity {
     return activities.filter(activity => activity.type === type);
   }
 
+  static async findMostRecentByUserId(userId) {
+    try {
+      const params = {
+        TableName: 'Activities',
+        FilterExpression: 'userId = :userId',
+        ExpressionAttributeValues: {
+          ':userId': userId
+        }
+      };
+
+      const result = await dynamoDB.scan(params).promise();
+      
+      if (!result.Items || result.Items.length === 0) {
+        return null;
+      }
+
+      // Sort by start_date descending and return the most recent
+      const sortedActivities = result.Items.sort((a, b) => 
+        new Date(b.start_date) - new Date(a.start_date)
+      );
+
+      return sortedActivities[0];
+    } catch (error) {
+      throw new Error(`Failed to find most recent activity: ${error.message}`);
+    }
+  }
+
   toJSON() {
     return { ...this };
   }

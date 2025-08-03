@@ -70,22 +70,22 @@ export interface Theme {
 
 export const lightTheme: Theme = {
   colors: {
-    primary: '#007bff',
-    primaryDark: '#0056b3',
-    primaryLight: '#66b3ff',
-    secondary: '#6c757d',
-    success: '#28a745',
-    warning: '#ffc107',
-    error: '#dc3545',
-    info: '#17a2b8',
+    primary: '#fc4c02', // Strava orange
+    primaryDark: '#d63a00',
+    primaryLight: '#ff7a33',
+    secondary: '#4a5568',
+    success: '#38a169',
+    warning: '#ed8936',
+    error: '#e53e3e',
+    info: '#3182ce',
     background: '#ffffff',
-    surface: '#f8f9fa',
+    surface: '#f7fafc',
     text: {
-      primary: '#212529',
-      secondary: '#6c757d',
-      disabled: '#adb5bd',
+      primary: '#1a202c',
+      secondary: '#4a5568',
+      disabled: '#a0aec0',
     },
-    border: '#dee2e6',
+    border: '#e2e8f0',
     shadow: 'rgba(0, 0, 0, 0.1)',
   },
   spacing: {
@@ -142,14 +142,14 @@ export const darkTheme: Theme = {
   ...lightTheme,
   colors: {
     ...lightTheme.colors,
-    background: '#1a1a1a',
-    surface: '#2d2d2d',
+    background: '#1a202c',
+    surface: '#2d3748',
     text: {
-      primary: '#ffffff',
-      secondary: '#b3b3b3',
-      disabled: '#666666',
+      primary: '#f7fafc',
+      secondary: '#a0aec0',
+      disabled: '#718096',
     },
-    border: '#404040',
-    shadow: 'rgba(0, 0, 0, 0.3)',
+    border: '#4a5568',
+    shadow: 'rgba(0, 0, 0, 0.4)',
   },
 };

@@ -128,6 +128,28 @@ class User {
     }
   }
 
+  async updateLastSync() {
+    try {
+      const lastSyncTime = new Date().toISOString();
+      const updatedAt = new Date().toISOString();
+      
+      await dynamoDB.update({
+        TableName: 'Users',
+        Key: { userId: this.userId },
+        UpdateExpression: 'SET lastSyncTime = :lst, updatedAt = :ua',
+        ExpressionAttributeValues: {
+          ':lst': lastSyncTime,
+          ':ua': updatedAt
+        }
+      }).promise();
+
+      this.lastSyncTime = lastSyncTime;
+      this.updatedAt = updatedAt;
+    } catch (error) {
+      throw new Error(`Failed to update last sync time: ${error.message}`);
+    }
+  }
+
   async validatePassword(password) {
     return bcrypt.compare(password, this.hashedPassword);
   }

@@ -8,6 +8,8 @@ class StravaAPI {
 
   async exchangeCodeForTokens(code) {
     try {
+      console.log('Attempting Strava token exchange with code:', code?.substring(0, 10) + '...');
+      
       const response = await axios.post(this.oauthURL, {
         client_id: process.env.STRAVA_CLIENT_ID,
         client_secret: process.env.STRAVA_CLIENT_SECRET,
@@ -15,8 +17,21 @@ class StravaAPI {
         grant_type: 'authorization_code',
       });
 
+      console.log('Strava token exchange successful');
       return response.data;
     } catch (error) {
+      console.error('Strava token exchange error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      if (error.response?.status === 400) {
+        const errorMsg = error.response?.data?.message || 'Invalid authorization code';
+        throw new Error(`Strava authorization failed: ${errorMsg}. The authorization code may have expired or already been used.`);
+      }
+      
       throw new Error(`Strava token exchange failed: ${error.response?.data?.message || error.message}`);
     }
   }
@@ -80,6 +95,33 @@ class StravaAPI {
     }
 
     return allActivities;
+  }
+
+  async getActivitiesSince(accessToken, afterTimestamp) {
+    try {
+      const params = {
+        per_page: 200 // Get more activities per request for efficiency
+      };
+
+      // If we have a timestamp, only get activities after that date
+      if (afterTimestamp) {
+        params.after = afterTimestamp;
+      }
+
+      const response = await axios.get(`${this.baseURL}/athlete/activities`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+        params
+      });
+
+      return response.data;
+    } catch (error) {
+      if (error.response?.status === 401) {
+        throw new Error('Strava access token expired');
+      }
+      throw new Error(`Failed to fetch Strava activities since ${afterTimestamp}: ${error.response?.data?.message || error.message}`);
+    }
   }
 
   async getAthleteProfile(accessToken) {

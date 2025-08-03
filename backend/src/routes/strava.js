@@ -18,4 +18,8 @@ router.post('/exchange_token', validate(stravaTokenSchema), stravaController.exc
 router.get('/activities', stravaController.getActivities);
 router.get('/activities/refresh', stravaController.refreshActivities);
 
+// Smart sync routes
+router.get('/sync-status', stravaController.checkSyncStatus);
+router.post('/auto-sync', stravaController.autoSync);
+
 module.exports = router;

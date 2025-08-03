@@ -251,3 +251,143 @@ export const Badge = styled.span<{ variant?: 'primary' | 'success' | 'warning' |
     return `background-color: ${color};`;
   }}
 `;
+
+// Form components
+export const FormGroup = styled.div`
+  margin-bottom: ${({ theme }: { theme: Theme }) => theme.spacing.lg};
+`;
+
+export const Label = styled.label`
+  display: block;
+  margin-bottom: ${({ theme }: { theme: Theme }) => theme.spacing.xs};
+  font-size: ${({ theme }: { theme: Theme }) => theme.typography.fontSize.sm};
+  font-weight: ${({ theme }: { theme: Theme }) => theme.typography.fontWeight.medium};
+  color: ${({ theme }: { theme: Theme }) => theme.colors.text.primary};
+`;
+
+export const ErrorMessage = styled.div`
+  margin-top: ${({ theme }: { theme: Theme }) => theme.spacing.xs};
+  font-size: ${({ theme }: { theme: Theme }) => theme.typography.fontSize.sm};
+  color: ${({ theme }: { theme: Theme }) => theme.colors.error};
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }: { theme: Theme }) => theme.spacing.xs};
+`;
+
+export const SuccessMessage = styled.div`
+  margin-top: ${({ theme }: { theme: Theme }) => theme.spacing.xs};
+  font-size: ${({ theme }: { theme: Theme }) => theme.typography.fontSize.sm};
+  color: ${({ theme }: { theme: Theme }) => theme.colors.success};
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }: { theme: Theme }) => theme.spacing.xs};
+`;
+
+export const HelpText = styled.div`
+  margin-top: ${({ theme }: { theme: Theme }) => theme.spacing.xs};
+  font-size: ${({ theme }: { theme: Theme }) => theme.typography.fontSize.xs};
+  color: ${({ theme }: { theme: Theme }) => theme.colors.text.secondary};
+`;
+
+// Loading components
+export const LoadingSpinner = styled.div`
+  width: 20px;
+  height: 20px;
+  border: 2px solid ${({ theme }: { theme: Theme }) => theme.colors.border};
+  border-top: 2px solid ${({ theme }: { theme: Theme }) => theme.colors.primary};
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+
+export const LoadingButton = styled(Button)<{ isLoading?: boolean }>`
+  position: relative;
+  
+  ${({ isLoading }) => isLoading && `
+    color: transparent;
+    
+    &::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 20px;
+      height: 20px;
+      border: 2px solid transparent;
+      border-top: 2px solid currentColor;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+  `}
+`;
+
+// Modal components
+export const ModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: ${({ theme }: { theme: Theme }) => theme.spacing.md};
+`;
+
+export const ModalContent = styled.div`
+  background: ${({ theme }: { theme: Theme }) => theme.colors.background};
+  border-radius: ${({ theme }: { theme: Theme }) => theme.borderRadius.lg};
+  padding: ${({ theme }: { theme: Theme }) => theme.spacing.xl};
+  box-shadow: ${({ theme }: { theme: Theme }) => theme.shadows.lg};
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+`;
+
+// Form layouts
+export const FormContainer = styled.div`
+  max-width: 400px;
+  margin: 0 auto;
+  padding: ${({ theme }: { theme: Theme }) => theme.spacing.xl};
+`;
+
+export const FormCard = styled(Card)`
+  max-width: 400px;
+  margin: 0 auto;
+`;
+
+// Status indicators
+export const StatusIndicator = styled.div<{ status: 'loading' | 'success' | 'error' | 'idle' }>`
+  display: inline-flex;
+  align-items: center;
+  gap: ${({ theme }: { theme: Theme }) => theme.spacing.xs};
+  font-size: ${({ theme }: { theme: Theme }) => theme.typography.fontSize.sm};
+  font-weight: ${({ theme }: { theme: Theme }) => theme.typography.fontWeight.medium};
+  
+  ${({ theme, status }: { theme: Theme; status: string }) => {
+    switch (status) {
+      case 'loading':
+        return `color: ${theme.colors.info};`;
+      case 'success':
+        return `color: ${theme.colors.success};`;
+      case 'error':
+        return `color: ${theme.colors.error};`;
+      default:
+        return `color: ${theme.colors.text.secondary};`;
+    }
+  }}
+`;

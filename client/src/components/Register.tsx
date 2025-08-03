@@ -1,8 +1,28 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { ThemeProvider } from 'styled-components';
 import config from '../config';
 import { AuthResponse, ApiError } from '../types';
+import { lightTheme } from '../styles/theme';
+import {
+  Container,
+  FormCard,
+  FormGroup,
+  Label,
+  Input,
+  LoadingButton,
+  ErrorMessage,
+  SuccessMessage,
+  HelpText,
+  Heading,
+  StatusIndicator,
+  LoadingSpinner,
+  Text,
+  ProgressBar,
+  ProgressText,
+  FlexContainer
+} from '../styles/components';
 
 const Register: React.FC = () => {
   const [email, setEmail] = useState<string>('');
@@ -10,6 +30,7 @@ const Register: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [registrationStep, setRegistrationStep] = useState<'form' | 'registering' | 'strava-auth'>('form');
   const navigate = useNavigate();
 
   // Get clientID from environment variable
@@ -28,25 +49,32 @@ const Register: React.FC = () => {
     setError('');
     setSuccess('');
     setIsLoading(true);
+    setRegistrationStep('registering');
 
     try {
-      // First, register the user
+      // Step 1: Register the user
       const registerResponse = await axios.post<AuthResponse>(`${config.API_BASE_URL}/api/auth/register`, { email, password });
 
       if (registerResponse.data.message === 'User registered successfully') {
-        setSuccess('User registered! Connecting to Strava...');
-
-        // Next, automatically login to get JWT
+        setSuccess('Account created successfully!');
+        
+        // Step 2: Automatically login to get JWT
         const loginResponse = await axios.post<AuthResponse>(`${config.API_BASE_URL}/api/auth/login`, { email, password });
         const { token } = loginResponse.data;
-        // Store JWT in localStorage
         localStorage.setItem('jwt', token);
 
-        // Redirect them immediately to Strava's Auth page
-        window.location.href = stravaAuthURL;
+        // Step 3: Prepare for Strava authorization
+        setRegistrationStep('strava-auth');
+        setSuccess('Preparing Strava connection...');
+        
+        // Give user a moment to see the progress, then redirect
+        setTimeout(() => {
+          window.location.href = stravaAuthURL;
+        }, 1500);
       }
     } catch (err: any) {
       setIsLoading(false);
+      setRegistrationStep('form');
       console.error('Register error:', err);
       
       // Handle specific error types
@@ -74,56 +102,120 @@ const Register: React.FC = () => {
     }
   };
 
+  const getProgressPercentage = () => {
+    switch (registrationStep) {
+      case 'form': return 0;
+      case 'registering': return 50;
+      case 'strava-auth': return 75;
+      default: return 0;
+    }
+  };
+
+  const getStepDescription = () => {
+    switch (registrationStep) {
+      case 'form': return 'Enter your details';
+      case 'registering': return 'Creating your account...';
+      case 'strava-auth': return 'Connecting to Strava...';
+      default: return '';
+    }
+  };
+
   return (
-    <div style={{ textAlign: 'center', marginTop: '50px' }}>
-      <h2>Register</h2>
-      {error && <p style={{ color:'red' }}>{error}</p>}
-      {success && <p style={{ color:'green' }}>{success}</p>}
-      <form onSubmit={handleRegister} style={{ display:'inline-block', textAlign:'left' }}>
-        <div style={{ marginBottom:'10px' }}>
-          <label>Email: </label>
-          <input 
-            type="email" 
-            value={email}
-            onChange={e => {
-              setEmail(e.target.value);
-            }}
-            required
-          />
-        </div>
-        <div style={{ marginBottom:'10px' }}>
-          <label>Password: </label>
-          <input 
-            type="password" 
-            value={password}
-            onChange={e => {
-              setPassword(e.target.value);
-            }}
-            required
-          />
-          <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
-            Password must contain:
-            <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
-              <li>At least 8 characters</li>
-              <li>One uppercase letter</li>
-              <li>One lowercase letter</li>
-              <li>One number</li>
-              <li>One special character (!@#$%^&*)</li>
-            </ul>
-          </div>
-        </div>
-        <button type="submit" disabled={isLoading} style={{ 
-          padding: '10px 20px', 
-          backgroundColor: isLoading ? '#ccc' : '#fc4c02',
-          color: 'white',
-          border: 'none',
-          borderRadius: '5px',
-          cursor: isLoading ? 'not-allowed' : 'pointer'
-        }}>
-          {isLoading ? 'Creating Account...' : 'Register & Connect Strava'}
-        </button>
-      </form>
-    </div>
+    <ThemeProvider theme={lightTheme}>
+      <Container>
+        <FormCard style={{ marginTop: '50px', textAlign: 'center' }}>
+          <Heading size="md">Create Your Account</Heading>
+          
+          {/* Progress indicator */}
+          {registrationStep !== 'form' && (
+            <FormGroup>
+              <FlexContainer direction="column" gap="sm">
+                <Text size="sm" weight="medium">{getStepDescription()}</Text>
+                <div style={{ position: 'relative' }}>
+                  <ProgressBar progress={getProgressPercentage()}>
+                    <ProgressText>{getProgressPercentage()}%</ProgressText>
+                  </ProgressBar>
+                </div>
+              </FlexContainer>
+            </FormGroup>
+          )}
+          
+          {error && (
+            <ErrorMessage>
+              ⚠️ {error}
+            </ErrorMessage>
+          )}
+          
+          {success && (
+            <SuccessMessage>
+              ✅ {success}
+            </SuccessMessage>
+          )}
+
+          {registrationStep === 'form' && (
+            <form onSubmit={handleRegister}>
+              <FormGroup>
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  required
+                />
+              </FormGroup>
+
+              <FormGroup>
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Create a strong password"
+                  required
+                />
+                <HelpText>
+                  <strong>Password Requirements:</strong>
+                  <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
+                    <li>At least 8 characters</li>
+                    <li>One uppercase letter</li>
+                    <li>One lowercase letter</li>
+                    <li>One number</li>
+                    <li>One special character (!@#$%^&*)</li>
+                  </ul>
+                </HelpText>
+              </FormGroup>
+
+              <FormGroup>
+                <LoadingButton
+                  type="submit"
+                  isLoading={isLoading}
+                  disabled={isLoading}
+                  size="lg"
+                  style={{ width: '100%' }}
+                >
+                  Register & Connect Strava
+                </LoadingButton>
+              </FormGroup>
+            </form>
+          )}
+
+          {registrationStep !== 'form' && (
+            <FormGroup>
+              <FlexContainer direction="column" gap="md" align="center">
+                <LoadingSpinner />
+                <Text size="sm" color="secondary">
+                  {registrationStep === 'registering' && 'Setting up your account...'}
+                  {registrationStep === 'strava-auth' && 'Redirecting to Strava for authorization...'}
+                </Text>
+              </FlexContainer>
+            </FormGroup>
+          )}
+        </FormCard>
+      </Container>
+    </ThemeProvider>
   );
 };
 
