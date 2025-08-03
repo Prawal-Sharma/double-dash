@@ -18,9 +18,20 @@ const { testConnection } = require('./config/database');
 const app = express();
 
 // Trust proxy for Elastic Beanstalk load balancer
-if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', 1);
-}
+// Always trust proxy in production environments (behind AWS ALB)
+app.set('trust proxy', 1);
+console.log('🔧 Trust proxy enabled for load balancer');
+
+// Debug middleware to log ALL headers before any processing
+app.use((req, res, next) => {
+  console.log('🔍 Raw request headers:', {
+    path: req.path,
+    method: req.method,
+    headers: req.headers,
+    ip: req.ip
+  });
+  next();
+});
 
 // Security middleware
 // app.use(helmet({ // TEMPORARILY DISABLED FOR DEBUGGING
@@ -44,7 +55,10 @@ app.use(cors({
   origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Auth-Token', 'X-Requested-With', 'Accept'],
+  exposedHeaders: ['Authorization', 'X-Auth-Token'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 
 // Body parsing middleware

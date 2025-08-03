@@ -7,8 +7,8 @@ const register = async (req, res, next) => {
 
     const user = await User.create({ email, password });
 
-    // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(user.userId);
+    // Generate tokens with user info
+    const { accessToken, refreshToken } = generateTokens(user.userId, user.email);
 
     // Set secure cookies
     setTokenCookies(res, accessToken, refreshToken);
@@ -44,8 +44,8 @@ const login = async (req, res, next) => {
       });
     }
 
-    // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(user.userId);
+    // Generate tokens with user info
+    const { accessToken, refreshToken } = generateTokens(user.userId, user.email);
 
     // Set secure cookies
     setTokenCookies(res, accessToken, refreshToken);

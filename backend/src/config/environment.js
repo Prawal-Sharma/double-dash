@@ -6,8 +6,6 @@ require('dotenv').config();
 const requiredEnvVars = {
   // AWS Configuration
   AWS_REGION: 'AWS region for DynamoDB and other services',
-  AWS_ACCESS_KEY_ID: 'AWS access key for DynamoDB access',
-  AWS_SECRET_ACCESS_KEY: 'AWS secret key for DynamoDB access',
   
   // Strava API Configuration
   STRAVA_CLIENT_ID: 'Strava OAuth client ID',
@@ -16,6 +14,12 @@ const requiredEnvVars = {
   // JWT Configuration
   JWT_SECRET: 'Secret key for JWT token signing',
   JWT_REFRESH_SECRET: 'Secret key for JWT refresh token signing',
+};
+
+// AWS credentials are only required in development (production uses IAM roles)
+const developmentOnlyEnvVars = {
+  AWS_ACCESS_KEY_ID: 'AWS access key for DynamoDB access',
+  AWS_SECRET_ACCESS_KEY: 'AWS secret key for DynamoDB access',
 };
 
 const optionalEnvVars = {
@@ -52,6 +56,7 @@ class EnvironmentValidator {
   }
 
   validateRequiredVars() {
+    // Check always-required variables
     Object.entries(requiredEnvVars).forEach(([key, description]) => {
       if (!process.env[key]) {
         this.errors.push(`Missing required environment variable: ${key} (${description})`);
@@ -59,6 +64,20 @@ class EnvironmentValidator {
         this.errors.push(`Empty required environment variable: ${key} (${description})`);
       }
     });
+    
+    // Check development-only variables (AWS credentials)
+    if (process.env.NODE_ENV === 'development') {
+      Object.entries(developmentOnlyEnvVars).forEach(([key, description]) => {
+        if (!process.env[key]) {
+          this.errors.push(`Missing required environment variable: ${key} (${description})`);
+        } else if (process.env[key].trim() === '') {
+          this.errors.push(`Empty required environment variable: ${key} (${description})`);
+        }
+      });
+    } else {
+      // In production, we expect IAM roles instead of credentials
+      this.warnings.push('Production environment detected - using IAM roles for AWS access');
+    }
   }
 
   setOptionalDefaults() {
@@ -124,10 +143,12 @@ const config = {
   NODE_ENV: process.env.NODE_ENV,
   PORT: parseInt(process.env.PORT),
   
-  // AWS
+  // AWS (conditional based on environment)
   AWS_REGION: process.env.AWS_REGION,
-  AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
-  AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
+  ...(process.env.NODE_ENV === 'development' && {
+    AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
+    AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
+  }),
   
   // Strava
   STRAVA_CLIENT_ID: process.env.STRAVA_CLIENT_ID,

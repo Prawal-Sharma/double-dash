@@ -230,14 +230,38 @@ export const ActivitiesProvider: React.FC<ActivitiesProviderProps> = ({ children
 
   // Check authentication and redirect if needed
   const checkAuthAndRedirect = React.useCallback((): boolean => {
+    const token = localStorage.getItem('jwt');
+    console.log('🔍 Dashboard auth check. Token exists:', !!token);
+    
+    if (token) {
+      console.log('🔍 Token length:', token.length, 'First 30 chars:', token.substring(0, 30));
+      
+      // Try to decode for debugging
+      try {
+        const decoded = TokenValidator.decodeToken(token);
+        console.log('🔍 Decoded dashboard token:', decoded);
+        console.log('🔍 Token expiry check:', {
+          exp: decoded?.exp,
+          currentTime: Math.floor(Date.now() / 1000),
+          isExpired: decoded ? decoded.exp < Math.floor(Date.now() / 1000) : 'no-exp'
+        });
+      } catch (error) {
+        console.error('❌ Failed to decode dashboard token:', error);
+      }
+    }
+    
     const { isAuthenticated, shouldRedirectToLogin } = validateAuthState();
+    console.log('🔍 Auth state validation result:', { isAuthenticated, shouldRedirectToLogin });
     
     if (shouldRedirectToLogin) {
+      console.log('❌ Auth check failed - token invalid/expired. Redirecting to login.');
       // Clear any cached data for security
       dispatch({ type: 'CLEAR_CACHE' });
       
-      // Redirect to login page
-      window.location.href = '/login';
+      // Use setTimeout to avoid React state update warnings
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 100);
       return false;
     }
     
@@ -293,10 +317,18 @@ export const ActivitiesProvider: React.FC<ActivitiesProviderProps> = ({ children
     dispatch({ type: 'FETCH_START' });
 
     try {
-      const response = await axios.get<ActivitiesResponse>(
+      console.log('🔍 Fetching activities from:', `${config.API_BASE_URL}/api/strava/activities`);
+      console.log('🔍 Using token for API request:', token.substring(0, 30) + '...');
+      
+      // Use POST to bypass CloudFront query string/header stripping
+      const response = await axios.post<ActivitiesResponse>(
         `${config.API_BASE_URL}/api/strava/activities`,
+        { token }, // Send token in request body
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'X-Auth-Token': token  // CloudFront-friendly custom header
+          },
           timeout: 10000 // 10 second timeout
         }
       );
@@ -314,12 +346,20 @@ export const ActivitiesProvider: React.FC<ActivitiesProviderProps> = ({ children
         }
       });
     } catch (error: any) {
-      console.error('Failed to fetch activities:', error);
+      console.error('❌ Failed to fetch activities:', error);
+      console.log('🔍 Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        code: error.code,
+        message: error.message
+      });
       
       let errorMessage = 'Failed to load activities';
       
       // Handle different types of errors
       if (error.response?.status === 401) {
+        console.error('❌ 401 Authentication error - clearing token and redirecting');
         errorMessage = 'Authentication expired. Redirecting to login...';
         
         // Clear invalid token and redirect
@@ -386,10 +426,15 @@ export const ActivitiesProvider: React.FC<ActivitiesProviderProps> = ({ children
     dispatch({ type: 'FETCH_START' });
 
     try {
-      const response = await axios.get<ActivitiesResponse>(
+      // Use POST to bypass CloudFront query string/header stripping
+      const response = await axios.post<ActivitiesResponse>(
         `${config.API_BASE_URL}/api/strava/activities/refresh`,
+        { token }, // Send token in request body
         {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'X-Auth-Token': token  // CloudFront-friendly custom header
+          }
         }
       );
 

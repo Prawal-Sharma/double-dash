@@ -2,7 +2,7 @@
 
 interface JWTPayload {
   userId: string;
-  email: string;
+  email?: string; // Make email optional for backward compatibility
   iat: number;
   exp: number;
 }

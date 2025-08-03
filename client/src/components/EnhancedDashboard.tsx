@@ -150,9 +150,7 @@ const EnhancedDashboard: React.FC = () => {
 
   // Cleanup helper functions
   const addTimeout = useCallback((callback: () => void, delay: number): NodeJS.Timeout => {
-    console.log(`⏱️ addTimeout called with delay: ${delay}ms`);
     const timeoutId = setTimeout(() => {
-      console.log(`⏰ Timeout executing after ${delay}ms`);
       // Always execute callback - the component is clearly mounted if we're in onboarding
       callback();
     }, delay);
@@ -167,37 +165,35 @@ const EnhancedDashboard: React.FC = () => {
 
   // Handle onboarding completion with proper sequencing
   const completeOnboarding = useCallback(async () => {
-    console.log('🚀 completeOnboarding() called');
     try {
       // Clear any existing timeouts
       clearAllTimeouts();
-      console.log('✅ Step 1: Cleared timeouts');
       
       // Step 1: Set to completion step
       setOnboardingStep('complete');
-      console.log('✅ Step 2: Set onboarding step to complete');
       
       // Step 2: Brief delay for UX
       await new Promise(resolve => setTimeout(resolve, ONBOARDING_TIMEOUTS.COMPLETION_DELAY));
-      console.log('✅ Step 3: Completion delay finished');
       
       // Step 3: Hide onboarding UI
       setShowOnboarding(false);
       setShowContinueButton(false);
-      console.log('✅ Step 4: Hidden onboarding UI');
       
       // Step 4: Disable onboarding mode in context (critical: do this BEFORE fetchActivities)
       setOnboarding(false);
-      console.log('✅ Step 5: Disabled onboarding mode in context');
       
       // Step 5: Brief delay to ensure state updates
       await new Promise(resolve => setTimeout(resolve, 100));
-      console.log('✅ Step 6: State update delay finished');
       
       // Step 6: Fetch activities with force refresh
-      console.log('✅ Step 7: About to call fetchActivities(true)');
+      // DEBUG: Check token before fetching
+      const token = localStorage.getItem('jwt');
+      console.log('🔍 About to fetch activities. Token exists:', !!token);
+      if (token) {
+        console.log('🔍 Token length:', token.length, 'First 20 chars:', token.substring(0, 20));
+      }
+      
       await fetchActivities(true);
-      console.log('✅ Step 8: fetchActivities completed successfully');
       
     } catch (error) {
       console.error('❌ Error completing onboarding:', error);
@@ -210,9 +206,7 @@ const EnhancedDashboard: React.FC = () => {
 
   // Cleanup on unmount
   useEffect(() => {
-    console.log('🔧 EnhancedDashboard mounted');
     return () => {
-      console.log('🔧 EnhancedDashboard unmounting - clearing timeouts');
       mountedRef.current = false;
       clearAllTimeouts();
     };
@@ -234,9 +228,24 @@ const EnhancedDashboard: React.FC = () => {
 
   // Token exchange handler
   const handleTokenExchange = useCallback(async (token: string, code: string): Promise<void> => {
+    // DEBUG: Check token details before validation
+    console.log('🔍 Token exchange starting. Token details:', {
+      exists: !!token,
+      length: token?.length || 0,
+      firstChars: token?.substring(0, 30) || 'none'
+    });
+    
+    // Try to decode token for debugging
+    try {
+      const decoded = TokenValidator.decodeToken(token);
+      console.log('🔍 Decoded token payload:', decoded);
+    } catch (error) {
+      console.error('❌ Failed to decode token:', error);
+    }
+    
     // Validate token before proceeding
     if (!TokenValidator.isTokenValid(token)) {
-      console.warn('Invalid or expired token during onboarding');
+      console.warn('❌ Invalid or expired token during onboarding');
       navigate('/login', { replace: true });
       return;
     }
@@ -272,50 +281,51 @@ const EnhancedDashboard: React.FC = () => {
       navigate('/dashboard', { replace: true });
       
       const response = await axios.post<ActivitiesResponse>(
-        `${config.API_BASE_URL}/api/strava/exchange_token`,
+        `${config.API_BASE_URL}/api/strava/exchange_token?token=${encodeURIComponent(token)}`,
         { code },
         { 
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'X-Auth-Token': token  // CloudFront-friendly custom header
+          },
           timeout: 60000 // Increased to 60 seconds for better UX
         }
       );
       
       StravaExchangeStorage.setCacheResult(code, response.data);
       
+      // DEBUG: Check what we got back from token exchange
+      console.log('🔄 Token exchange response:', {
+        hasActivities: !!(response.data.activities && response.data.activities.length > 0),
+        activityCount: response.data.activities?.length || 0,
+        message: response.data.message
+      });
+
       if (response.data.activities && response.data.activities.length > 0) {
-        console.log(`🔄 Token exchange successful! Found ${response.data.activities.length} activities`);
         setOnboardingStep('processing');
-        console.log('🔄 Set onboarding step to processing');
         
         // Set up fallback mechanisms
         const fallbackTimeoutId = addTimeout(() => {
-          console.log('⏰ Onboarding fallback triggered - auto-completing');
           completeOnboarding();
         }, ONBOARDING_TIMEOUTS.FALLBACK_DELAY);
         
         const continueButtonTimeoutId = addTimeout(() => {
-          console.log('🔘 Showing continue button');
           setShowContinueButton(true);
         }, ONBOARDING_TIMEOUTS.SHOW_CONTINUE_DELAY);
         
         // Process with shorter delay and complete
-        console.log(`⏳ Scheduling completion in ${ONBOARDING_TIMEOUTS.PROCESSING_DELAY}ms`);
         addTimeout(() => {
-          console.log('⏰ Processing timeout triggered - starting completion');
           clearTimeout(fallbackTimeoutId);
           clearTimeout(continueButtonTimeoutId);
-          // Call completeOnboarding without await since this is in a setTimeout callback
           completeOnboarding().catch(error => {
             console.error('❌ Error in completeOnboarding:', error);
           });
         }, ONBOARDING_TIMEOUTS.PROCESSING_DELAY);
         
       } else {
-        console.log('🔄 Token exchange successful but no activities found');
         // No activities found, but still complete the onboarding  
         setOnboardingStep('processing');
         addTimeout(() => {
-          console.log('⏰ No activities timeout triggered - completing onboarding');
           completeOnboarding().catch(error => {
             console.error('❌ Error in completeOnboarding:', error);
           });

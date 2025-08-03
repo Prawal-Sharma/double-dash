@@ -16,7 +16,9 @@ router.use(stravaLimiter);
 // Strava integration routes
 router.post('/exchange_token', validate(stravaTokenSchema), stravaController.exchangeToken);
 router.get('/activities', stravaController.getActivities);
+router.post('/activities', stravaController.getActivities); // POST alternative to bypass CloudFront
 router.get('/activities/refresh', stravaController.refreshActivities);
+router.post('/activities/refresh', stravaController.refreshActivities); // POST alternative
 
 // Smart sync routes
 router.get('/sync-status', stravaController.checkSyncStatus);

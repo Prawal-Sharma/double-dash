@@ -31,10 +31,38 @@ const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
+      console.log('🔍 Attempting login to:', `${config.API_BASE_URL}/api/auth/login`);
       const response = await axios.post<AuthResponse>(`${config.API_BASE_URL}/api/auth/login`, { email, password });
+      
+      console.log('🔍 Login response:', {
+        status: response.status,
+        hasToken: !!(response.data.token),
+        tokenLength: response.data.token?.length || 0,
+        responseData: response.data
+      });
+      
       const { token } = response.data;
+      
+      if (!token) {
+        console.error('❌ No token received from login response');
+        setError('Login failed - no token received');
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log('🔍 Storing token in localStorage:', token.substring(0, 30) + '...');
+      
       // Store JWT in localStorage
       localStorage.setItem('jwt', token);
+      
+      // Verify it was stored
+      const storedToken = localStorage.getItem('jwt');
+      console.log('🔍 Token verification after storage:', {
+        stored: !!storedToken,
+        matches: storedToken === token,
+        storedLength: storedToken?.length || 0
+      });
+      
       // Redirect to home
       navigate('/');
     } catch (err: any) {
