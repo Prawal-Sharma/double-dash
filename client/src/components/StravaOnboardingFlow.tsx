@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled, { ThemeProvider } from 'styled-components';
 import { lightTheme, darkTheme } from '../styles/theme';
-import { Container, Heading, Text, FlexContainer } from '../styles/components';
+import { Container, Heading, Text, FlexContainer, Button } from '../styles/components';
 
 // Styled Components
 const OnboardingContainer = styled(Container)`
@@ -131,6 +131,8 @@ interface StravaOnboardingFlowProps {
   totalExpected?: number;
   isDarkMode?: boolean;
   onComplete?: () => void;
+  showContinueButton?: boolean;
+  onContinue?: () => void;
 }
 
 // Step configuration
@@ -172,7 +174,9 @@ const StravaOnboardingFlow: React.FC<StravaOnboardingFlowProps> = ({
   activityCount = 0,
   totalExpected = 0,
   isDarkMode = false,
-  onComplete
+  onComplete,
+  showContinueButton = false,
+  onContinue
 }) => {
   const [displayCount, setDisplayCount] = useState(0);
   const currentStep = stepConfig[step];
@@ -279,6 +283,23 @@ const StravaOnboardingFlow: React.FC<StravaOnboardingFlowProps> = ({
               <Text size="sm" color="secondary">
                 Found {activityCount.toLocaleString()} activities ready for analysis
               </Text>
+            </FlexContainer>
+          )}
+
+          {/* Continue Button for stuck onboarding */}
+          {showContinueButton && step === 'processing' && onContinue && (
+            <FlexContainer direction="column" gap="sm" style={{ marginTop: '24px' }}>
+              <Text size="sm" color="secondary" style={{ opacity: 0.8 }}>
+                Taking longer than expected?
+              </Text>
+              <Button 
+                variant="primary" 
+                size="md" 
+                onClick={onContinue}
+                style={{ minWidth: '180px' }}
+              >
+                Continue to Dashboard
+              </Button>
             </FlexContainer>
           )}
         </OnboardingCard>

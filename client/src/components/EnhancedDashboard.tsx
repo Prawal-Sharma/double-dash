@@ -17,8 +17,10 @@ import {
   Section
 } from '../styles/components';
 import StravaOnboardingFlow, { OnboardingStep } from './StravaOnboardingFlow';
+import AuthErrorBoundary from './AuthErrorBoundary';
 import { useActivities } from '../contexts/ActivitiesContext';
 import { StravaExchangeStorage, LocalStorageManager } from '../utils/sessionStorage';
+import { TokenValidator, validateAuthState } from '../utils/tokenValidation';
 import { 
   convertMetersToMiles, 
   convertMetersToFeet, 
@@ -27,10 +29,12 @@ import {
 
 // Constants
 const ONBOARDING_TIMEOUTS = {
-  PROCESSING_DELAY: 1500,
-  COMPLETION_DELAY: 2000,
+  PROCESSING_DELAY: 300, // Reduced from 1500ms
+  COMPLETION_DELAY: 800,  // Reduced from 2000ms  
   TIMEOUT_DELAY: 4000,
-  CLEANUP_DELAY: 5 * 60 * 1000 // 5 minutes
+  CLEANUP_DELAY: 5 * 60 * 1000, // 5 minutes
+  FALLBACK_DELAY: 5000, // Auto-proceed after 5 seconds
+  SHOW_CONTINUE_DELAY: 3000 // Show continue button after 3 seconds
 } as const;
 
 const RATE_LIMIT_WINDOW = 30000; // 30 seconds
@@ -120,7 +124,7 @@ const ThemeToggle = styled(Button)`
 const EnhancedDashboard: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { state: activitiesState, fetchActivities, refreshActivities } = useActivities();
+  const { state: activitiesState, fetchActivities, refreshActivities, checkAuthAndRedirect, setOnboarding } = useActivities();
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
   // Extract data from context
@@ -129,19 +133,28 @@ const EnhancedDashboard: React.FC = () => {
   // Onboarding flow state
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>('connecting');
+  const [showContinueButton, setShowContinueButton] = useState<boolean>(false);
   
   // Refs for cleanup
   const timeoutRefs = useRef<Array<NodeJS.Timeout>>([]);
   const mountedRef = useRef(true);
+  
+  // Debug: Log mountedRef changes
+  useEffect(() => {
+    console.log('🔧 mountedRef initialized to:', mountedRef.current);
+    mountedRef.current = true; // Ensure it's set to true
+    console.log('🔧 mountedRef set to:', mountedRef.current);
+  }, []);
 
   const code: string | null = searchParams.get('code');
 
   // Cleanup helper functions
   const addTimeout = useCallback((callback: () => void, delay: number): NodeJS.Timeout => {
+    console.log(`⏱️ addTimeout called with delay: ${delay}ms`);
     const timeoutId = setTimeout(() => {
-      if (mountedRef.current) {
-        callback();
-      }
+      console.log(`⏰ Timeout executing after ${delay}ms`);
+      // Always execute callback - the component is clearly mounted if we're in onboarding
+      callback();
     }, delay);
     timeoutRefs.current.push(timeoutId);
     return timeoutId;
@@ -152,9 +165,54 @@ const EnhancedDashboard: React.FC = () => {
     timeoutRefs.current = [];
   }, []);
 
+  // Handle onboarding completion with proper sequencing
+  const completeOnboarding = useCallback(async () => {
+    console.log('🚀 completeOnboarding() called');
+    try {
+      // Clear any existing timeouts
+      clearAllTimeouts();
+      console.log('✅ Step 1: Cleared timeouts');
+      
+      // Step 1: Set to completion step
+      setOnboardingStep('complete');
+      console.log('✅ Step 2: Set onboarding step to complete');
+      
+      // Step 2: Brief delay for UX
+      await new Promise(resolve => setTimeout(resolve, ONBOARDING_TIMEOUTS.COMPLETION_DELAY));
+      console.log('✅ Step 3: Completion delay finished');
+      
+      // Step 3: Hide onboarding UI
+      setShowOnboarding(false);
+      setShowContinueButton(false);
+      console.log('✅ Step 4: Hidden onboarding UI');
+      
+      // Step 4: Disable onboarding mode in context (critical: do this BEFORE fetchActivities)
+      setOnboarding(false);
+      console.log('✅ Step 5: Disabled onboarding mode in context');
+      
+      // Step 5: Brief delay to ensure state updates
+      await new Promise(resolve => setTimeout(resolve, 100));
+      console.log('✅ Step 6: State update delay finished');
+      
+      // Step 6: Fetch activities with force refresh
+      console.log('✅ Step 7: About to call fetchActivities(true)');
+      await fetchActivities(true);
+      console.log('✅ Step 8: fetchActivities completed successfully');
+      
+    } catch (error) {
+      console.error('❌ Error completing onboarding:', error);
+      // Fallback: force hide onboarding and show dashboard
+      setShowOnboarding(false);
+      setShowContinueButton(false);
+      setOnboarding(false);
+    }
+  }, [clearAllTimeouts, setOnboarding, fetchActivities]);
+
   // Cleanup on unmount
   useEffect(() => {
+    console.log('🔧 EnhancedDashboard mounted');
     return () => {
+      console.log('🔧 EnhancedDashboard unmounting - clearing timeouts');
       mountedRef.current = false;
       clearAllTimeouts();
     };
@@ -176,6 +234,13 @@ const EnhancedDashboard: React.FC = () => {
 
   // Token exchange handler
   const handleTokenExchange = useCallback(async (token: string, code: string): Promise<void> => {
+    // Validate token before proceeding
+    if (!TokenValidator.isTokenValid(token)) {
+      console.warn('Invalid or expired token during onboarding');
+      navigate('/login', { replace: true });
+      return;
+    }
+    
     // Check if this code was already successfully processed
     const cachedResult = StravaExchangeStorage.getCacheResult(code);
     if (cachedResult) {
@@ -218,24 +283,43 @@ const EnhancedDashboard: React.FC = () => {
       StravaExchangeStorage.setCacheResult(code, response.data);
       
       if (response.data.activities && response.data.activities.length > 0) {
+        console.log(`🔄 Token exchange successful! Found ${response.data.activities.length} activities`);
         setOnboardingStep('processing');
+        console.log('🔄 Set onboarding step to processing');
         
-        // Force refresh the context data and wait for it to complete
-        await fetchActivities(true);
+        // Set up fallback mechanisms
+        const fallbackTimeoutId = addTimeout(() => {
+          console.log('⏰ Onboarding fallback triggered - auto-completing');
+          completeOnboarding();
+        }, ONBOARDING_TIMEOUTS.FALLBACK_DELAY);
         
-        // Use managed timeout for UI updates
+        const continueButtonTimeoutId = addTimeout(() => {
+          console.log('🔘 Showing continue button');
+          setShowContinueButton(true);
+        }, ONBOARDING_TIMEOUTS.SHOW_CONTINUE_DELAY);
+        
+        // Process with shorter delay and complete
+        console.log(`⏳ Scheduling completion in ${ONBOARDING_TIMEOUTS.PROCESSING_DELAY}ms`);
         addTimeout(() => {
-          setOnboardingStep('complete');
-          addTimeout(() => {
-            setShowOnboarding(false);
-          }, ONBOARDING_TIMEOUTS.COMPLETION_DELAY);
+          console.log('⏰ Processing timeout triggered - starting completion');
+          clearTimeout(fallbackTimeoutId);
+          clearTimeout(continueButtonTimeoutId);
+          // Call completeOnboarding without await since this is in a setTimeout callback
+          completeOnboarding().catch(error => {
+            console.error('❌ Error in completeOnboarding:', error);
+          });
         }, ONBOARDING_TIMEOUTS.PROCESSING_DELAY);
+        
       } else {
-        // No activities found, but still complete the onboarding
-        setOnboardingStep('complete');
+        console.log('🔄 Token exchange successful but no activities found');
+        // No activities found, but still complete the onboarding  
+        setOnboardingStep('processing');
         addTimeout(() => {
-          setShowOnboarding(false);
-        }, ONBOARDING_TIMEOUTS.COMPLETION_DELAY);
+          console.log('⏰ No activities timeout triggered - completing onboarding');
+          completeOnboarding().catch(error => {
+            console.error('❌ Error in completeOnboarding:', error);
+          });
+        }, ONBOARDING_TIMEOUTS.PROCESSING_DELAY);
       }
       
       // Cleanup session storage
@@ -244,43 +328,64 @@ const EnhancedDashboard: React.FC = () => {
       }, ONBOARDING_TIMEOUTS.CLEANUP_DELAY);
       
     } catch (error: any) {
+      console.error('Token exchange error:', error);
+      
       // Handle different types of errors with better UX
-      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      if (error.response?.status === 401) {
+        // Authentication error during onboarding
+        console.warn('Authentication failed during token exchange');
+        TokenValidator.clearToken();
+        navigate('/login', { replace: true });
+        return;
+        
+      } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
         // Show timeout-specific onboarding step
         setOnboardingStep('timeout');
         addTimeout(() => {
           setShowOnboarding(false);
         }, ONBOARDING_TIMEOUTS.TIMEOUT_DELAY);
+        
       } else {
+        // Other errors - hide onboarding and let context handle
         setShowOnboarding(false);
       }
       
-      // Let the context handle the error display
+      // Let the context handle the error display for non-auth errors
     } finally {
       StravaExchangeStorage.finishProcessing(code);
     }
-  }, [navigate, fetchActivities, addTimeout]);
+  }, [navigate, fetchActivities, addTimeout, setOnboarding, completeOnboarding]);
 
   useEffect(() => {
     const initializeDashboard = async () => {
-      const token = localStorage.getItem('jwt');
-      if (!token) {
+      // Check authentication state first
+      const { isAuthenticated, token, shouldRedirectToLogin } = validateAuthState();
+      
+      if (shouldRedirectToLogin) {
+        navigate('/login', { replace: true });
+        return;
+      }
+
+      if (!isAuthenticated || !token) {
+        console.warn('No valid authentication found');
         return; // Let the context handle the auth error
       }
 
       if (code) {
         console.log('Starting onboarding flow for new user');
+        setOnboarding(true); // Prevent context from fetching during onboarding
         setShowOnboarding(true);
         setOnboardingStep('connecting');
         await handleTokenExchange(token, code);
       } else {
         // Normal dashboard load - use context
+        setOnboarding(false); // Allow context to fetch normally
         await fetchActivities();
       }
     };
 
     initializeDashboard();
-  }, [code, handleTokenExchange, fetchActivities]);
+  }, [code, handleTokenExchange, fetchActivities, navigate, setOnboarding]);
 
   // Handle refresh using context
   const handleRefresh = async () => {
@@ -295,11 +400,34 @@ const EnhancedDashboard: React.FC = () => {
         activityCount={activities.length}
         isDarkMode={isDarkMode}
         onComplete={() => setShowOnboarding(false)}
+        showContinueButton={showContinueButton}
+        onContinue={completeOnboarding}
       />
     );
   }
 
   if (error) {
+    // Check if this is an authentication error
+    const isAuthError = error.includes('Authentication') || 
+                       error.includes('expired') || 
+                       error.includes('Redirecting to login');
+    
+    if (isAuthError) {
+      return (
+        <AuthErrorBoundary 
+          error={error}
+          isDarkMode={isDarkMode}
+          onRetry={() => {
+            // Try to check auth and redirect, or reload
+            if (!checkAuthAndRedirect()) {
+              window.location.reload();
+            }
+          }}
+        />
+      );
+    }
+    
+    // Non-auth errors - show regular error container
     return (
       <ThemeProvider theme={isDarkMode ? darkTheme : lightTheme}>
         <Container>
