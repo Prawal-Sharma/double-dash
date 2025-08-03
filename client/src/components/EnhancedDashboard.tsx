@@ -125,6 +125,7 @@ const EnhancedDashboard: React.FC = () => {
     message: string;
   } | null>(null);
   const [autoSyncing, setAutoSyncing] = useState<boolean>(false);
+  const [tokenExchangeInProgress, setTokenExchangeInProgress] = useState<boolean>(false);
 
   const code: string | null = searchParams.get('code');
 
@@ -155,12 +156,22 @@ const EnhancedDashboard: React.FC = () => {
     };
 
     const exchangeTokenAndFetch = async (token: string, code: string): Promise<ActivitiesResponse> => {
+      // Prevent multiple simultaneous token exchanges
+      if (tokenExchangeInProgress) {
+        throw new Error('Token exchange already in progress');
+      }
+      
       try {
+        setTokenExchangeInProgress(true);
         const response = await axios.post<ActivitiesResponse>(
           `${config.API_BASE_URL}/api/strava/exchange_token`,
           { code },
           { headers: { Authorization: `Bearer ${token}` } }
         );
+        
+        // Clear the code from URL after successful exchange
+        navigate('/dashboard', { replace: true });
+        
         return response.data;
       } catch (err: any) {
         // Check if this is a Strava authorization error
@@ -170,6 +181,8 @@ const EnhancedDashboard: React.FC = () => {
           throw new Error('Strava authorization failed');
         }
         throw new Error('Failed to exchange Strava token');
+      } finally {
+        setTokenExchangeInProgress(false);
       }
     };
 
@@ -280,7 +293,7 @@ const EnhancedDashboard: React.FC = () => {
     };
 
     fetchData();
-  }, [code]);
+  }, [code]); // Only re-run when code changes
 
   const handleRefresh = async () => {
     setLoading(true);
