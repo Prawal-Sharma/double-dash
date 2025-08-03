@@ -1,5 +1,8 @@
 // Environment variable validation and configuration
 
+// Load environment variables from .env file first
+require('dotenv').config();
+
 const requiredEnvVars = {
   // AWS Configuration
   AWS_REGION: 'AWS region for DynamoDB and other services',
