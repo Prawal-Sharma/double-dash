@@ -16,6 +16,8 @@ import {
   Text,
   Section
 } from '../styles/components';
+import StravaOnboardingFlow, { OnboardingStep } from './StravaOnboardingFlow';
+import { useActivities } from '../contexts/ActivitiesContext';
 
 // Utils
 import { 
@@ -51,7 +53,6 @@ const MetricLabel = styled.div`
   font-size: ${({ theme }) => theme.typography.fontSize.md};
   opacity: 0.9;
 `;
-
 
 const LoadingContainer = styled.div`
   display: flex;
@@ -110,22 +111,15 @@ const ThemeToggle = styled(Button)`
 const EnhancedDashboard: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [summary, setSummary] = useState<ActivitySummary>({} as ActivitySummary);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const { state: activitiesState, fetchActivities, refreshActivities } = useActivities();
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
-  // Dashboard-specific states
-  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
-  const [syncStatus, setSyncStatus] = useState<{
-    needsSync: boolean;
-    connected: boolean;
-    hoursElapsed?: number;
-    message: string;
-  } | null>(null);
-  const [autoSyncing, setAutoSyncing] = useState<boolean>(false);
-  const [processingStep, setProcessingStep] = useState<'idle' | 'token-exchange' | 'sync-check' | 'loading-data'>('idle');
+  // Extract data from context
+  const { activities, summary, loading, error, lastSyncTime } = activitiesState;
+  
+  // Onboarding flow state
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
+  const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>('connecting');
 
   const code: string | null = searchParams.get('code');
 
@@ -143,288 +137,145 @@ const EnhancedDashboard: React.FC = () => {
     localStorage.setItem('dashboardTheme', newTheme ? 'dark' : 'light');
   };
 
-  useEffect(() => {
-    const fetchActivitiesFromDB = async (token: string): Promise<ActivitiesResponse> => {
-      try {
-        const response = await axios.get<ActivitiesResponse>(`${config.API_BASE_URL}/api/strava/activities`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        return response.data;
-      } catch (err) {
-        throw new Error('Failed to fetch activities from database');
-      }
-    };
-
-    const handleTokenExchange = async (token: string, code: string): Promise<ActivitiesResponse | null> => {
-      const cacheKey = `strava-exchange-${code}`;
-      const processingKey = `processing-${code}`;
-      const timestampKey = `exchange-timestamp-${code}`;
-      
-      // Check if this code was already successfully processed
-      const cachedResult = sessionStorage.getItem(cacheKey);
-      if (cachedResult) {
-        console.log('Using cached token exchange result');
-        // Clear URL immediately when using cached result
-        navigate('/dashboard', { replace: true });
-        return JSON.parse(cachedResult);
-      }
-      
-      // Check if this code is currently being processed
-      if (sessionStorage.getItem(processingKey)) {
-        console.log('Token exchange already in progress, skipping duplicate request');
-        // Clear URL to prevent multiple attempts
-        navigate('/dashboard', { replace: true });
-        return null;
-      }
-      
-      // Check if this code was recently attempted (within 30 seconds) to prevent spam
-      const lastAttempt = sessionStorage.getItem(timestampKey);
-      if (lastAttempt && (Date.now() - parseInt(lastAttempt)) < 30000) {
-        console.log('Recent token exchange attempt detected, skipping to prevent rate limiting');
-        navigate('/dashboard', { replace: true });
-        setError('Please wait a moment before trying again.');
-        return null;
-      }
-      
-      try {
-        // Mark as processing immediately
-        sessionStorage.setItem(processingKey, 'true');
-        sessionStorage.setItem(timestampKey, Date.now().toString());
-        setProcessingStep('token-exchange');
-        
-        // Clear the code from URL immediately to prevent re-execution
-        navigate('/dashboard', { replace: true });
-        
-        console.log('Starting Strava token exchange...');
-        const response = await axios.post<ActivitiesResponse>(
-          `${config.API_BASE_URL}/api/strava/exchange_token`,
-          { code },
-          { 
-            headers: { Authorization: `Bearer ${token}` },
-            timeout: 30000 // 30 second timeout
-          }
-        );
-        
-        console.log('Token exchange successful, caching result');
-        // Cache the successful result
-        sessionStorage.setItem(cacheKey, JSON.stringify(response.data));
-        
-        // Clean up all related cache keys after successful exchange
-        setTimeout(() => {
-          sessionStorage.removeItem(cacheKey);
-          sessionStorage.removeItem(timestampKey);
-        }, 5 * 60 * 1000); // Clean up after 5 minutes
-        
-        return response.data;
-      } catch (err: any) {
-        console.error('Token exchange failed:', err);
-        
-        // Check if this is a Strava authorization error (code already used)
-        if (err.response?.status === 400) {
-          const errorMsg = err.response?.data?.message || '';
-          if (errorMsg.includes('invalid') || errorMsg.includes('expired') || errorMsg.includes('used')) {
-            setError('This authorization link has already been used or expired. Please register again to get a fresh link.');
-          } else {
-            setError('Authorization failed. Please try registering again.');
-          }
-          return null;
-        }
-        
-        // Check for unauthorized access
-        if (err.response?.status === 401) {
-          setError('Authentication failed. Please log in again and retry.');
-          return null;
-        }
-        
-        // Check for rate limiting
-        if (err.response?.status === 429) {
-          setError('Too many requests. Please wait a moment and try again.');
-          return null;
-        }
-        
-        // Network or timeout errors
-        if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
-          setError('Connection timeout. Please check your internet and try again.');
-          return null;
-        }
-        
-        // Generic error
-        setError('Connection failed. Please refresh the page and try again.');
-        return null;
-      } finally {
-        // Clean up processing flag
-        sessionStorage.removeItem(processingKey);
-        setProcessingStep('idle');
-      }
-    };
-
-    const checkSyncStatus = async (token: string) => {
-      try {
-        const response = await axios.get(`${config.API_BASE_URL}/api/strava/sync-status`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setSyncStatus(response.data);
-        return response.data;
-      } catch (err) {
-        console.error('Failed to check sync status:', err);
-        return null;
-      }
-    };
-
-    // Auto-sync function (currently unused but may be needed later)
-    // const performAutoSync = async (token: string) => {
-    //   try {
-    //     setAutoSyncing(true);
-    //     const response = await axios.post(`${config.API_BASE_URL}/api/strava/auto-sync`, {}, {
-    //       headers: { Authorization: `Bearer ${token}` }
-    //     });
-    //     
-    //     if (response.data.synced !== false) {
-    //       // Auto-sync actually performed, update activities
-    //       if (response.data.activities) {
-    //         const sortedActivities = response.data.activities.sort(
-    //           (a: Activity, b: Activity) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
-    //         );
-    //         setActivities(sortedActivities);
-    //         setSummary(response.data.summary);
-    //         setLastSyncTime(new Date(response.data.lastSyncTime));
-    //       }
-    //     }
-    //     
-    //     return response.data;
-    //   } catch (err) {
-    //     console.error('Auto-sync failed:', err);
-    //     return null;
-    //   } finally {
-    //     setAutoSyncing(false);
-    //   }
-    // };
-
-    const loadDashboard = async () => {
-      setLoading(true);
-      setError(null);
-      const token = localStorage.getItem('jwt');
-      
-      if (!token) {
-        setError('Please log in to view your dashboard.');
-        setLoading(false);
-        return;
-      }
-
-      try {
-        let data: ActivitiesResponse | null = null;
-        
-        // Step 1: Handle token exchange if code is present
-        if (code) {
-          console.log('Dashboard loading with Strava authorization code');
-          data = await handleTokenExchange(token, code);
-          if (!data) {
-            // Token exchange failed or was skipped - don't show loading anymore
-            setLoading(false);
-            return;
-          }
-          
-          // Token exchange successful - update UI immediately
-          if (data.activities && data.activities.length > 0) {
-            const sortedActivities = data.activities.sort(
-              (a: Activity, b: Activity) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
-            );
-            setActivities(sortedActivities);
-            setSummary(data.summary);
-            setLastSyncTime(data.lastSyncTime ? new Date(data.lastSyncTime) : new Date());
-            console.log(`Successfully loaded ${sortedActivities.length} activities from token exchange`);
-          }
-        } else {
-          // Step 2: Normal dashboard load - optimistic loading
-          setProcessingStep('sync-check');
-          console.log('Dashboard loading in normal mode');
-          
-          try {
-            // First, try to get existing data from database quickly
-            data = await fetchActivitiesFromDB(token);
-            
-            // Update UI immediately with existing data (optimistic loading)
-            if (data && data.activities && data.activities.length > 0) {
-              const sortedActivities = data.activities.sort(
-                (a: Activity, b: Activity) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
-              );
-              setActivities(sortedActivities);
-              setSummary(data.summary);
-              setLastSyncTime(data.lastSyncTime ? new Date(data.lastSyncTime) : new Date());
-              console.log(`Loaded ${sortedActivities.length} cached activities from database`);
-              
-              // Stop loading since we have data to show
-              setLoading(false);
-              setProcessingStep('idle');
-              
-              // Then check sync status in background (non-blocking)
-              checkSyncStatus(token).then(syncStatusData => {
-                if (syncStatusData && syncStatusData.connected && syncStatusData.needsSync) {
-                  setSyncStatus(syncStatusData);
-                  console.log('Sync status: New data available');
-                } else if (syncStatusData) {
-                  setSyncStatus(syncStatusData);
-                  console.log('Sync status: Up to date');
-                }
-              }).catch(err => {
-                console.warn('Background sync status check failed:', err);
-              });
-              
-              return; // Exit early since we have data
-            }
-            
-          } catch (dbErr) {
-            console.log('No cached activities found, showing onboarding');
-            // No data in database - show onboarding message
-            setActivities([]);
-            setSummary({} as ActivitySummary);
-            setError('Welcome to DoubleDash! Connect your Strava account to get started.');
-          }
-        }
-        
-      } catch (err) {
-        console.error('Dashboard load error:', err);
-        setError('Unable to load dashboard. Please refresh the page to try again.');
-      } finally {
-        setLoading(false);
-        setProcessingStep('idle');
-      }
-    };
-
-    loadDashboard();
-  }, [code, navigate]); // Only re-run when code or navigate changes
-
-  const handleRefresh = async () => {
-    setLoading(true);
-    const token = localStorage.getItem('jwt');
+  // Token exchange handler
+  const handleTokenExchange = async (token: string, code: string): Promise<void> => {
+    const cacheKey = `strava-exchange-${code}`;
+    const processingKey = `processing-${code}`;
+    const timestampKey = `exchange-timestamp-${code}`;
     
-    if (!token) {
-      setError('You must be logged in to refresh activities.');
-      setLoading(false);
+    // Check if this code was already successfully processed
+    const cachedResult = sessionStorage.getItem(cacheKey);
+    if (cachedResult) {
+      console.log('Using cached token exchange result');
+      navigate('/dashboard', { replace: true });
+      const data = JSON.parse(cachedResult);
+      if (data.activities && data.activities.length > 0) {
+        setOnboardingStep('complete');
+        setTimeout(() => setShowOnboarding(false), 2000);
+      }
       return;
     }
-
+    
+    // Check if already processing
+    if (sessionStorage.getItem(processingKey)) {
+      console.log('Token exchange already in progress');
+      navigate('/dashboard', { replace: true });
+      return;
+    }
+    
+    // Check rate limiting
+    const lastAttempt = sessionStorage.getItem(timestampKey);
+    if (lastAttempt && (Date.now() - parseInt(lastAttempt)) < 30000) {
+      console.log('Recent token exchange attempt detected');
+      navigate('/dashboard', { replace: true });
+      return;
+    }
+    
     try {
-      const response = await axios.get<ActivitiesResponse>(`${config.API_BASE_URL}/api/strava/activities/refresh`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      sessionStorage.setItem(processingKey, 'true');
+      sessionStorage.setItem(timestampKey, Date.now().toString());
+      setOnboardingStep('syncing');
       
-      if (response.data.activities) {
-        const sortedActivities = response.data.activities.sort(
-          (a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
-        );
-        setActivities(sortedActivities);
-        setSummary(response.data.summary);
-        setLastSyncTime(new Date());
+      // Clear URL immediately
+      navigate('/dashboard', { replace: true });
+      
+      console.log('Starting Strava token exchange...');
+      const response = await axios.post<ActivitiesResponse>(
+        `${config.API_BASE_URL}/api/strava/exchange_token`,
+        { code },
+        { 
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 60000 // Increased to 60 seconds for better UX
+        }
+      );
+      
+      console.log('Token exchange successful');
+      sessionStorage.setItem(cacheKey, JSON.stringify(response.data));
+      
+      if (response.data.activities && response.data.activities.length > 0) {
+        setOnboardingStep('processing');
+        
+        // Force refresh the context data and wait for it to complete
+        await fetchActivities(true);
+        
+        // Give a small delay to ensure UI updates
+        setTimeout(() => {
+          setOnboardingStep('complete');
+          setTimeout(() => {
+            setShowOnboarding(false);
+          }, 2000);
+        }, 1500);
+      } else {
+        // No activities found, but still complete the onboarding
+        setOnboardingStep('complete');
+        setTimeout(() => {
+          setShowOnboarding(false);
+        }, 2000);
       }
-    } catch (err) {
-      setError('Failed to refresh activities');
+      
+      // Cleanup
+      setTimeout(() => {
+        sessionStorage.removeItem(cacheKey);
+        sessionStorage.removeItem(timestampKey);
+      }, 5 * 60 * 1000);
+      
+    } catch (error: any) {
+      console.error('Token exchange failed:', error);
+      
+      // Handle different types of errors with better UX
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        // Show timeout-specific onboarding step
+        setOnboardingStep('timeout');
+        setTimeout(() => {
+          setShowOnboarding(false);
+        }, 4000);
+      } else {
+        setShowOnboarding(false);
+      }
+      
+      // Let the context handle the error display
     } finally {
-      setLoading(false);
+      sessionStorage.removeItem(processingKey);
     }
   };
 
+  useEffect(() => {
+    const initializeDashboard = async () => {
+      const token = localStorage.getItem('jwt');
+      if (!token) {
+        return; // Let the context handle the auth error
+      }
 
+      if (code) {
+        console.log('Starting onboarding flow for new user');
+        setShowOnboarding(true);
+        setOnboardingStep('connecting');
+        await handleTokenExchange(token, code);
+      } else {
+        // Normal dashboard load - use context
+        await fetchActivities();
+      }
+    };
+
+    initializeDashboard();
+  }, [code]); // Only re-run when code changes
+
+  // Handle refresh using context
+  const handleRefresh = async () => {
+    await refreshActivities();
+  };
+
+  // Show onboarding flow for first-time users
+  if (showOnboarding) {
+    return (
+      <StravaOnboardingFlow
+        step={onboardingStep}
+        activityCount={activities.length}
+        isDarkMode={isDarkMode}
+        onComplete={() => setShowOnboarding(false)}
+      />
+    );
+  }
 
   if (error) {
     return (
@@ -448,23 +299,15 @@ const EnhancedDashboard: React.FC = () => {
         <Container>
           <LoadingContainer>
             <LoadingSpinner />
-            <Heading size="md">
-              {processingStep === 'token-exchange' ? 'Connecting to Strava...' :
-               processingStep === 'sync-check' ? 'Loading Your Dashboard...' :
-               'Loading Your Analytics...'}
-            </Heading>
-            <Text>
-              {processingStep === 'token-exchange' ? 'Setting up your account with Strava' :
-               processingStep === 'sync-check' ? 'Getting your latest activities' :
-               'Crunching your running data'}
-            </Text>
+            <Heading size="md">🏃‍♂️ Loading Your Dashboard...</Heading>
+            <Text>Getting your latest activities</Text>
           </LoadingContainer>
         </Container>
       </ThemeProvider>
     );
   }
 
-  if (activities.length === 0 && !code) {
+  if (activities.length === 0 && !code && !loading) {
     return (
       <ThemeProvider theme={isDarkMode ? darkTheme : lightTheme}>
         <Container>
@@ -498,46 +341,18 @@ const EnhancedDashboard: React.FC = () => {
               <FlexContainer gap="sm" align="center">
                 <Button 
                   onClick={handleRefresh}
-                  disabled={loading || autoSyncing || processingStep !== 'idle'}
+                  disabled={loading}
                   variant="primary"
                   size="sm"
                 >
-                  {processingStep === 'token-exchange' ? '🔗 Connecting to Strava...' :
-                   processingStep === 'sync-check' ? '🔍 Checking for updates...' :
-                   loading ? '⏳ Syncing...' : 
-                   autoSyncing ? '🔄 Auto-syncing...' : 
-                   '🔄 Sync Strava'}
+                  {loading ? '⏳ Syncing...' : '🔄 Sync Strava'}
                 </Button>
-                
-                {syncStatus && (
-                  <Text 
-                    size="xs" 
-                    color="secondary"
-                    style={{ 
-                      padding: '4px 8px', 
-                      borderRadius: '12px', 
-                      backgroundColor: syncStatus.needsSync ? '#fff3cd' : '#d1edff',
-                      border: `1px solid ${syncStatus.needsSync ? '#ffeaa7' : '#74b9ff'}`,
-                      color: syncStatus.needsSync ? '#856404' : '#0c5460'
-                    }}
-                  >
-                    {syncStatus.needsSync ? '🟡 New data available' : '🟢 Up to date'}
-                  </Text>
-                )}
               </FlexContainer>
               
               <FlexContainer direction="column" align="flex-end" gap="xs">
                 {lastSyncTime && (
                   <Text size="xs" color="secondary">
                     Last synced: {lastSyncTime.toLocaleString()}
-                  </Text>
-                )}
-                {syncStatus?.hoursElapsed && (
-                  <Text size="xs" color="secondary">
-                    {syncStatus.hoursElapsed < 1 ? 
-                      'Less than 1 hour ago' : 
-                      `${syncStatus.hoursElapsed.toFixed(1)} hours ago`
-                    }
                   </Text>
                 )}
               </FlexContainer>
@@ -563,45 +378,6 @@ const EnhancedDashboard: React.FC = () => {
               <MetricLabel>Feet Climbed</MetricLabel>
             </MetricCard>
           </MetricsGrid>
-
-          {/* Auto-sync Status Card */}
-          {syncStatus && syncStatus.connected && (
-            <Card style={{ 
-              marginBottom: '24px',
-              background: autoSyncing ? 
-                'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)' :
-                syncStatus.needsSync ? 
-                  'linear-gradient(135deg, #fff3e0 0%, #ffcc02 20%)' : 
-                  'linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%)',
-              border: `1px solid ${autoSyncing ? '#2196f3' : syncStatus.needsSync ? '#ff9800' : '#4caf50'}`,
-            }}>
-              <FlexContainer align="center" gap="md">
-                <Text size="lg">
-                  {autoSyncing ? '🔄' : syncStatus.needsSync ? '🟡' : '🟢'}
-                </Text>
-                <div style={{ flex: 1 }}>
-                  <Text weight="medium" size="md">
-                    {autoSyncing ? 'Auto-syncing in progress...' :
-                     syncStatus.needsSync ? 'New activities may be available' :
-                     'Your data is up to date'}
-                  </Text>
-                  <Text size="sm" color="secondary">
-                    {autoSyncing ? 'Checking for new activities from Strava' :
-                     syncStatus.message}
-                  </Text>
-                </div>
-                {syncStatus.needsSync && !autoSyncing && (
-                  <Button 
-                    onClick={handleRefresh}
-                    variant="primary"
-                    size="sm"
-                  >
-                    Sync Now
-                  </Button>
-                )}
-              </FlexContainer>
-            </Card>
-          )}
 
           {/* Recent Activities Preview */}
           <Card style={{ marginBottom: '32px' }}>

@@ -40,7 +40,7 @@ const Register: React.FC = () => {
     console.error('REACT_APP_STRAVA_CLIENT_ID environment variable is not set');
   }
   
-  const redirectURI = `${config.FRONTEND_URL}/exchange_token`;
+  const redirectURI = `${config.FRONTEND_URL}/dashboard`;
   const scope = 'read,activity:read';
   const stravaAuthURL = `https://www.strava.com/oauth/authorize?client_id=${clientID}&response_type=code&redirect_uri=${redirectURI}&approval_prompt=force&scope=${scope}`;
 

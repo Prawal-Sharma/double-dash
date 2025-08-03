@@ -356,8 +356,56 @@ AWS_PROFILE=doubledash-deploy eb logs --all
 - Enhanced CORS configuration for production environment
 - Improved token exchange flow with race condition prevention
 
+### CloudFront API Proxy Configuration
+**Distribution ID**: E2E1ONM9ZZ1STD  
+**Domain**: https://api.doubledash.ai  
+**Origin**: doubledash-api.us-west-2.elasticbeanstalk.com  
+**SSL Certificate**: *.doubledash.ai (ACM)  
+**HTTP Methods**: All methods allowed (GET, POST, PUT, DELETE, OPTIONS, PATCH)  
+**Cache Policy**: API optimized (minimal caching for dynamic content)  
+
+```bash
+# Update CloudFront distribution
+AWS_PROFILE=doubledash-deploy aws cloudfront update-distribution \
+  --id E2E1ONM9ZZ1STD --distribution-config file://config.json --if-match <etag>
+
+# Check deployment status  
+AWS_PROFILE=doubledash-deploy aws cloudfront get-distribution \
+  --id E2E1ONM9ZZ1STD --query 'Distribution.Status'
+```
+
+---
+
+## Current Status (August 3, 2025)
+
+### ✅ **FULLY DEPLOYED AND OPERATIONAL** 🚀
+
+**All Services Running Successfully:**
+- ✅ **Frontend**: https://doubledash.ai (S3 + CloudFront)
+- ✅ **Backend API**: https://api.doubledash.ai (CloudFront + Elastic Beanstalk)  
+- ✅ **Database**: DynamoDB operational and healthy
+- ✅ **HTTPS Communication**: End-to-end encryption working
+- ✅ **CORS**: Properly configured for cross-origin requests
+
+### 🔒 HTTPS Solution Implemented
+**Problem Resolved**: Mixed content error eliminated  
+**Solution**: CloudFront HTTPS proxy with SSL certificate
+
+**Architecture:**
+```
+Frontend (HTTPS) → CloudFront (HTTPS) → Elastic Beanstalk (HTTP)
+https://doubledash.ai → https://api.doubledash.ai → backend servers
+```
+
+**Features Working:**
+- ✅ User registration and authentication
+- ✅ Strava OAuth integration  
+- ✅ Token exchange without race conditions
+- ✅ Enhanced error handling and UX improvements
+- ✅ Progressive loading and optimistic UI updates
+
 ---
 
 **Last Updated**: August 3, 2025  
-**Deployed Version**: Latest (with UX improvements)  
+**Deployed Version**: Latest (with UX improvements) - Backend functional, HTTPS setup pending  
 **Maintainer**: Development Team

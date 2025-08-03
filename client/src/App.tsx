@@ -8,22 +8,25 @@ import Analytics from './components/Analytics';
 import StravaAuthFailure from './components/StravaAuthFailure';
 import Login from './components/Login';
 import Register from './components/Register';
+import { ActivitiesProvider } from './contexts/ActivitiesContext';
 
 const App: React.FC = () => {
   return (
-    <Router>
-      <Navbar />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/dashboard" element={<EnhancedDashboard />} />
-        <Route path="/activities" element={<Activities />} />
-        <Route path="/analytics" element={<Analytics />} />
-        <Route path="/auth-failure" element={<StravaAuthFailure />} />
-        <Route path="/exchange_token" element={<EnhancedDashboard />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-      </Routes>
-    </Router>
+    <ActivitiesProvider>
+      <Router>
+        <Navbar />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/dashboard" element={<EnhancedDashboard />} />
+          <Route path="/activities" element={<Activities />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/auth-failure" element={<StravaAuthFailure />} />
+          <Route path="/exchange_token" element={<EnhancedDashboard />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+        </Routes>
+      </Router>
+    </ActivitiesProvider>
   );
 }
 

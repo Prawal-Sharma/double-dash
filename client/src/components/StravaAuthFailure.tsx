@@ -41,7 +41,7 @@ const StravaAuthFailure: React.FC = () => {
       return;
     }
     
-    const redirectURI = `${window.location.origin}/exchange_token`;
+    const redirectURI = `${window.location.origin}/dashboard`;
     const scope = 'read,activity:read';
     const stravaAuthURL = `https://www.strava.com/oauth/authorize?client_id=${clientID}&response_type=code&redirect_uri=${redirectURI}&approval_prompt=force&scope=${scope}`;
     

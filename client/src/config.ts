@@ -3,7 +3,7 @@ import { AppConfig } from './types';
 // This file tells your React app where your backend server lives
 const config: AppConfig = {
     API_BASE_URL: process.env.NODE_ENV === 'production' 
-      ? 'http://doubledash-api.us-west-2.elasticbeanstalk.com'  // When deployed to AWS
+      ? 'https://api.doubledash.ai'  // When deployed to AWS (HTTPS required for mixed content)
       : 'http://localhost:3001',     // When running locally
     
     FRONTEND_URL: process.env.NODE_ENV === 'production'

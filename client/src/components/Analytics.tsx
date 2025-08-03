@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useActivities } from '../contexts/ActivitiesContext';
 import { ThemeProvider } from 'styled-components';
 import { 
   LineChart, 
@@ -16,8 +16,8 @@ import {
   Legend, 
   ResponsiveContainer 
 } from 'recharts';
-import config from '../config';
 import { lightTheme } from '../styles/theme';
+import { Activity } from '../types';
 import {
   Container,
   Card,
@@ -90,17 +90,6 @@ const FilterContainer = styled(FlexContainer)`
   border-radius: ${({ theme }) => theme.borderRadius.md};
 `;
 
-interface Activity {
-  activityId: string;
-  name: string;
-  type: string;
-  distance: number;
-  moving_time: number;
-  total_elevation_gain: number;
-  start_date: string;
-  average_speed: number;
-  average_heartrate?: number;
-}
 
 interface AnalyticsData {
   totalDistance: number;
@@ -122,16 +111,17 @@ interface AnalyticsData {
 }
 
 const Analytics: React.FC = () => {
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const { state: activitiesState, fetchActivities } = useActivities();
+  const { activities, loading, error } = activitiesState;
+  
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [timeRange, setTimeRange] = useState<'all' | '30d' | '90d' | '1y'>('all');
   const [activityType, setActivityType] = useState<'all' | 'Run' | 'Ride'>('all');
 
   useEffect(() => {
+    // Fetch activities using context on mount
     fetchActivities();
-  }, []);
+  }, [fetchActivities]);
 
   useEffect(() => {
     if (activities.length > 0) {
@@ -140,27 +130,6 @@ const Analytics: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activities, timeRange, activityType]);
 
-  const fetchActivities = async () => {
-    try {
-      const token = localStorage.getItem('jwt');
-      if (!token) {
-        setError('Please log in to view your analytics');
-        setLoading(false);
-        return;
-      }
-
-      const response = await axios.get(`${config.API_BASE_URL}/api/strava/activities`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      setActivities(response.data.activities || []);
-    } catch (err: any) {
-      console.error('Error fetching activities:', err);
-      setError('Failed to load analytics data. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const filterActivitiesByTimeRange = (activities: Activity[]): Activity[] => {
     const now = new Date();

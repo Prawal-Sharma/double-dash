@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { ThemeProvider } from 'styled-components';
-import config from '../config';
+import styled from 'styled-components';
 import { lightTheme } from '../styles/theme';
+import { useActivities } from '../contexts/ActivitiesContext';
+import { Activity } from '../types';
 import {
   Container,
   Card,
@@ -18,7 +19,6 @@ import {
   ErrorMessage,
   Badge
 } from '../styles/components';
-import styled from 'styled-components';
 
 const ActivityCard = styled(Card)`
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -65,59 +65,24 @@ const SearchContainer = styled(FlexContainer)`
   border-radius: ${({ theme }) => theme.borderRadius.md};
 `;
 
-interface Activity {
-  activityId: string;
-  name: string;
-  type: string;
-  distance: number;
-  moving_time: number;
-  total_elevation_gain: number;
-  start_date: string;
-  average_speed: number;
-  max_speed: number;
-  average_heartrate?: number;
-  max_heartrate?: number;
-}
-
 const Activities: React.FC = () => {
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const { state: activitiesState, fetchActivities } = useActivities();
+  const { activities, loading, error } = activitiesState;
+  
   const [filteredActivities, setFilteredActivities] = useState<Activity[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'distance' | 'duration'>('date');
   const [filterType, setFilterType] = useState<'all' | 'Run' | 'Ride'>('all');
 
   useEffect(() => {
+    // Fetch activities using context on mount
     fetchActivities();
-  }, []);
+  }, [fetchActivities]);
 
   useEffect(() => {
     filterAndSortActivities();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activities, searchTerm, sortBy, filterType]);
-
-  const fetchActivities = async () => {
-    try {
-      const token = localStorage.getItem('jwt');
-      if (!token) {
-        setError('Please log in to view your activities');
-        setLoading(false);
-        return;
-      }
-
-      const response = await axios.get(`${config.API_BASE_URL}/api/strava/activities`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      setActivities(response.data.activities || []);
-    } catch (err: any) {
-      console.error('Error fetching activities:', err);
-      setError('Failed to load activities. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const filterAndSortActivities = () => {
     let filtered = [...activities];
