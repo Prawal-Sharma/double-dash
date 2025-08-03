@@ -9,6 +9,7 @@ const Register: React.FC = () => {
   const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const navigate = useNavigate();
 
   // Get clientID from environment variable
@@ -26,16 +27,17 @@ const Register: React.FC = () => {
     e.preventDefault();
     setError('');
     setSuccess('');
+    setIsLoading(true);
 
     try {
       // First, register the user
-      const registerResponse = await axios.post<AuthResponse>(`${config.API_BASE_URL}/register`, { email, password });
+      const registerResponse = await axios.post<AuthResponse>(`${config.API_BASE_URL}/api/auth/register`, { email, password });
 
       if (registerResponse.data.message === 'User registered successfully') {
         setSuccess('User registered! Connecting to Strava...');
 
         // Next, automatically login to get JWT
-        const loginResponse = await axios.post<AuthResponse>(`${config.API_BASE_URL}/login`, { email, password });
+        const loginResponse = await axios.post<AuthResponse>(`${config.API_BASE_URL}/api/auth/login`, { email, password });
         const { token } = loginResponse.data;
         // Store JWT in localStorage
         localStorage.setItem('jwt', token);
@@ -43,9 +45,32 @@ const Register: React.FC = () => {
         // Redirect them immediately to Strava's Auth page
         window.location.href = stravaAuthURL;
       }
-    } catch (err) {
+    } catch (err: any) {
+      setIsLoading(false);
       console.error('Register error:', err);
-      setError('Error registering user, maybe already exists or invalid data.');
+      
+      // Handle specific error types
+      if (err.response?.status === 400) {
+        const errorData = err.response.data;
+        
+        // Handle validation errors
+        if (errorData.code === 'VALIDATION_ERROR' && errorData.details) {
+          const messages = errorData.details.map((detail: any) => detail.message).join(', ');
+          setError(`Registration failed: ${messages}`);
+        } else if (errorData.message) {
+          setError(errorData.message);
+        } else {
+          setError('Invalid registration data. Please check your email and password.');
+        }
+      } else if (err.response?.status === 409) {
+        setError('An account with this email already exists. Please use a different email or try logging in.');
+      } else if (err.response?.status === 500) {
+        setError('Server error. Please try again later.');
+      } else if (err.code === 'NETWORK_ERROR' || !err.response) {
+        setError('Network error. Please check your connection and try again.');
+      } else {
+        setError('Registration failed. Please try again.');
+      }
     }
   };
 
@@ -76,8 +101,27 @@ const Register: React.FC = () => {
             }}
             required
           />
+          <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
+            Password must contain:
+            <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
+              <li>At least 8 characters</li>
+              <li>One uppercase letter</li>
+              <li>One lowercase letter</li>
+              <li>One number</li>
+              <li>One special character (!@#$%^&*)</li>
+            </ul>
+          </div>
         </div>
-        <button type="submit">Register & Connect Strava</button>
+        <button type="submit" disabled={isLoading} style={{ 
+          padding: '10px 20px', 
+          backgroundColor: isLoading ? '#ccc' : '#fc4c02',
+          color: 'white',
+          border: 'none',
+          borderRadius: '5px',
+          cursor: isLoading ? 'not-allowed' : 'pointer'
+        }}>
+          {isLoading ? 'Creating Account...' : 'Register & Connect Strava'}
+        </button>
       </form>
     </div>
   );

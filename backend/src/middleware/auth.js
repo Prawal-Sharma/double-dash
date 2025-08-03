@@ -2,6 +2,14 @@ const jwt = require('jsonwebtoken');
 
 const authMiddleware = (req, res, next) => {
   try {
+    // Check if JWT_SECRET is available
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({ 
+        error: 'Server configuration error',
+        code: 'JWT_SECRET_MISSING'
+      });
+    }
+    
     // First check for JWT in cookies (more secure)
     let token = req.cookies?.jwt;
     

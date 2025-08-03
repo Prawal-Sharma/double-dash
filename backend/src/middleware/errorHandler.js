@@ -16,12 +16,21 @@ const errorHandler = (err, req, res, next) => {
 
   // Handle specific error types
   if (err.name === 'ValidationError') {
-    error = {
-      message: 'Validation failed',
-      code: 'VALIDATION_ERROR',
-      details: err.details
-    };
-    res.status(400);
+    // Check if it's a "User already exists" validation error
+    if (err.message === 'User already exists') {
+      error = {
+        message: 'An account with this email already exists',
+        code: 'USER_EXISTS'
+      };
+      res.status(409);
+    } else {
+      error = {
+        message: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        details: err.details
+      };
+      res.status(400);
+    }
   } else if (err.name === 'UnauthorizedError') {
     error = {
       message: 'Unauthorized access',

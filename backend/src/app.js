@@ -18,17 +18,17 @@ const { testConnection } = require('./config/database');
 const app = express();
 
 // Security middleware
-app.use(helmet({
-  crossOriginEmbedderPolicy: false,
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
-  },
-}));
+// app.use(helmet({ // TEMPORARILY DISABLED FOR DEBUGGING
+//   crossOriginEmbedderPolicy: false,
+//   contentSecurityPolicy: {
+//     directives: {
+//       defaultSrc: ["'self'"],
+//       styleSrc: ["'self'", "'unsafe-inline'"],
+//       scriptSrc: ["'self'"],
+//       imgSrc: ["'self'", "data:", "https:"],
+//     },
+//   },
+// }));
 
 // CORS configuration
 const allowedOrigins = process.env.NODE_ENV === 'production' 
@@ -51,13 +51,42 @@ app.use(cookieParser());
 app.use(apiLimiter);
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
+app.get('/health', async (req, res) => {
+  const healthCheck = {
+    status: 'healthy',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
-  });
+    environment: process.env.NODE_ENV || 'development',
+    version: '1.0.0',
+    uptime: process.uptime(),
+    services: {}
+  };
+
+  try {
+    // Check database connectivity
+    const { testConnection } = require('./config/database');
+    await testConnection();
+    healthCheck.services.database = 'healthy';
+  } catch (error) {
+    healthCheck.services.database = 'unhealthy';
+    healthCheck.status = 'degraded';
+  }
+
+  // Check environment variables
+  const requiredEnvVars = ['JWT_SECRET', 'STRAVA_CLIENT_ID', 'STRAVA_CLIENT_SECRET'];
+  const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+  
+  if (missingEnvVars.length > 0) {
+    healthCheck.services.environment = 'degraded';
+    healthCheck.status = 'degraded';
+    healthCheck.warnings = [`Missing environment variables: ${missingEnvVars.join(', ')}`];
+  } else {
+    healthCheck.services.environment = 'healthy';
+  }
+
+  const statusCode = healthCheck.status === 'healthy' ? 200 : 503;
+  res.status(statusCode).json(healthCheck);
 });
+
 
 // API routes
 app.use('/api/auth', authRoutes);

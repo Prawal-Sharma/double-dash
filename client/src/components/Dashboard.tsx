@@ -29,7 +29,7 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const fetchActivitiesFromDB = async (token: string): Promise<ActivitiesResponse> => {
       try {
-        const response = await axios.get<ActivitiesResponse>(`${config.API_BASE_URL}/activities`, {
+        const response = await axios.get<ActivitiesResponse>(`${config.API_BASE_URL}/api/strava/activities`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         return response.data;
@@ -41,7 +41,7 @@ const Dashboard: React.FC = () => {
     const exchangeTokenAndFetch = async (token: string, code: string): Promise<ActivitiesResponse> => {
       try {
         const response = await axios.post<ActivitiesResponse>(
-          `${config.API_BASE_URL}/exchange_token`,
+          `${config.API_BASE_URL}/api/strava/exchange_token`,
           { code },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -100,7 +100,7 @@ const Dashboard: React.FC = () => {
     }
 
     try {
-      const response = await axios.get<ActivitiesResponse>(`${config.API_BASE_URL}/activities/refresh`, {
+      const response = await axios.get<ActivitiesResponse>(`${config.API_BASE_URL}/api/strava/activities/refresh`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       

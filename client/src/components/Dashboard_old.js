@@ -29,7 +29,7 @@ const Dashboard = () => {
     const fetchActivitiesFromDB = async (token) => {
       console.log('Fetching activities from DB with token:', token);
       try {
-        const response = await axios.get(`${config.API_BASE_URL}/activities`, {
+        const response = await axios.get(`${config.API_BASE_URL}/api/strava/activities`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         console.log('Activities fetched from DB:', response.data);
@@ -44,7 +44,7 @@ const Dashboard = () => {
       console.log('Exchanging token with Strava. Token:', token, 'Code:', code);
       try {
         const response = await axios.post(
-          `${config.API_BASE_URL}/exchange_token`,
+          `${config.API_BASE_URL}/api/strava/exchange_token`,
           { code },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -111,7 +111,7 @@ const Dashboard = () => {
 
     try {
       console.log('Refreshing activities with token:', token);
-      const response = await axios.get(`${config.API_BASE_URL}/activities/refresh`, {
+      const response = await axios.get(`${config.API_BASE_URL}/api/strava/activities/refresh`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (response.data.activities) {
