@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
 import { ThemeProvider } from 'styled-components';
 import config from '../config';
-import { AuthResponse, ApiError } from '../types';
+import { AuthResponse } from '../types';
 import { lightTheme } from '../styles/theme';
 import {
   Container,
@@ -16,7 +15,6 @@ import {
   SuccessMessage,
   HelpText,
   Heading,
-  StatusIndicator,
   LoadingSpinner,
   Text,
   ProgressBar,
@@ -31,7 +29,6 @@ const Register: React.FC = () => {
   const [success, setSuccess] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [registrationStep, setRegistrationStep] = useState<'form' | 'registering' | 'strava-auth'>('form');
-  const navigate = useNavigate();
 
   // Get clientID from environment variable
   const clientID = process.env.REACT_APP_STRAVA_CLIENT_ID;

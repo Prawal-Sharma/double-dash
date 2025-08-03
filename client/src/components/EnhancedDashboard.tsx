@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { ThemeProvider } from 'styled-components';
 import styled from 'styled-components';
 import config from '../config';
-import { Activity, ActivitySummary, ActivitiesResponse } from '../types';
+import { ActivitiesResponse } from '../types';
 import { lightTheme, darkTheme } from '../styles/theme';
 import { 
   Container, 
@@ -18,13 +18,22 @@ import {
 } from '../styles/components';
 import StravaOnboardingFlow, { OnboardingStep } from './StravaOnboardingFlow';
 import { useActivities } from '../contexts/ActivitiesContext';
-
-// Utils
+import { StravaExchangeStorage, LocalStorageManager } from '../utils/sessionStorage';
 import { 
   convertMetersToMiles, 
   convertMetersToFeet, 
   convertSecondsToHours
 } from '../utils/activityUtils';
+
+// Constants
+const ONBOARDING_TIMEOUTS = {
+  PROCESSING_DELAY: 1500,
+  COMPLETION_DELAY: 2000,
+  TIMEOUT_DELAY: 4000,
+  CLEANUP_DELAY: 5 * 60 * 1000 // 5 minutes
+} as const;
+
+const RATE_LIMIT_WINDOW = 30000; // 30 seconds
 
 const MetricsGrid = styled(Grid)`
   margin-bottom: ${({ theme }) => theme.spacing.xl};
@@ -120,12 +129,40 @@ const EnhancedDashboard: React.FC = () => {
   // Onboarding flow state
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>('connecting');
+  
+  // Refs for cleanup
+  const timeoutRefs = useRef<Array<NodeJS.Timeout>>([]);
+  const mountedRef = useRef(true);
 
   const code: string | null = searchParams.get('code');
 
+  // Cleanup helper functions
+  const addTimeout = useCallback((callback: () => void, delay: number): NodeJS.Timeout => {
+    const timeoutId = setTimeout(() => {
+      if (mountedRef.current) {
+        callback();
+      }
+    }, delay);
+    timeoutRefs.current.push(timeoutId);
+    return timeoutId;
+  }, []);
+
+  const clearAllTimeouts = useCallback(() => {
+    timeoutRefs.current.forEach(clearTimeout);
+    timeoutRefs.current = [];
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      clearAllTimeouts();
+    };
+  }, [clearAllTimeouts]);
+
   useEffect(() => {
     // Check for saved theme preference
-    const savedTheme = localStorage.getItem('dashboardTheme');
+    const savedTheme = LocalStorageManager.getItem('dashboardTheme');
     if (savedTheme === 'dark') {
       setIsDarkMode(true);
     }
@@ -134,52 +171,41 @@ const EnhancedDashboard: React.FC = () => {
   const toggleTheme = () => {
     const newTheme = !isDarkMode;
     setIsDarkMode(newTheme);
-    localStorage.setItem('dashboardTheme', newTheme ? 'dark' : 'light');
+    LocalStorageManager.setItem('dashboardTheme', newTheme ? 'dark' : 'light');
   };
 
   // Token exchange handler
-  const handleTokenExchange = async (token: string, code: string): Promise<void> => {
-    const cacheKey = `strava-exchange-${code}`;
-    const processingKey = `processing-${code}`;
-    const timestampKey = `exchange-timestamp-${code}`;
-    
+  const handleTokenExchange = useCallback(async (token: string, code: string): Promise<void> => {
     // Check if this code was already successfully processed
-    const cachedResult = sessionStorage.getItem(cacheKey);
+    const cachedResult = StravaExchangeStorage.getCacheResult(code);
     if (cachedResult) {
-      console.log('Using cached token exchange result');
       navigate('/dashboard', { replace: true });
-      const data = JSON.parse(cachedResult);
-      if (data.activities && data.activities.length > 0) {
+      if (cachedResult.activities && cachedResult.activities.length > 0) {
         setOnboardingStep('complete');
-        setTimeout(() => setShowOnboarding(false), 2000);
+        addTimeout(() => setShowOnboarding(false), ONBOARDING_TIMEOUTS.COMPLETION_DELAY);
       }
       return;
     }
     
     // Check if already processing
-    if (sessionStorage.getItem(processingKey)) {
-      console.log('Token exchange already in progress');
+    if (StravaExchangeStorage.isCurrentlyProcessing(code)) {
       navigate('/dashboard', { replace: true });
       return;
     }
     
     // Check rate limiting
-    const lastAttempt = sessionStorage.getItem(timestampKey);
-    if (lastAttempt && (Date.now() - parseInt(lastAttempt)) < 30000) {
-      console.log('Recent token exchange attempt detected');
+    if (StravaExchangeStorage.isRecentAttempt(code, RATE_LIMIT_WINDOW)) {
       navigate('/dashboard', { replace: true });
       return;
     }
     
     try {
-      sessionStorage.setItem(processingKey, 'true');
-      sessionStorage.setItem(timestampKey, Date.now().toString());
+      StravaExchangeStorage.markAsProcessing(code);
       setOnboardingStep('syncing');
       
       // Clear URL immediately
       navigate('/dashboard', { replace: true });
       
-      console.log('Starting Strava token exchange...');
       const response = await axios.post<ActivitiesResponse>(
         `${config.API_BASE_URL}/api/strava/exchange_token`,
         { code },
@@ -189,8 +215,7 @@ const EnhancedDashboard: React.FC = () => {
         }
       );
       
-      console.log('Token exchange successful');
-      sessionStorage.setItem(cacheKey, JSON.stringify(response.data));
+      StravaExchangeStorage.setCacheResult(code, response.data);
       
       if (response.data.activities && response.data.activities.length > 0) {
         setOnboardingStep('processing');
@@ -198,46 +223,43 @@ const EnhancedDashboard: React.FC = () => {
         // Force refresh the context data and wait for it to complete
         await fetchActivities(true);
         
-        // Give a small delay to ensure UI updates
-        setTimeout(() => {
+        // Use managed timeout for UI updates
+        addTimeout(() => {
           setOnboardingStep('complete');
-          setTimeout(() => {
+          addTimeout(() => {
             setShowOnboarding(false);
-          }, 2000);
-        }, 1500);
+          }, ONBOARDING_TIMEOUTS.COMPLETION_DELAY);
+        }, ONBOARDING_TIMEOUTS.PROCESSING_DELAY);
       } else {
         // No activities found, but still complete the onboarding
         setOnboardingStep('complete');
-        setTimeout(() => {
+        addTimeout(() => {
           setShowOnboarding(false);
-        }, 2000);
+        }, ONBOARDING_TIMEOUTS.COMPLETION_DELAY);
       }
       
-      // Cleanup
-      setTimeout(() => {
-        sessionStorage.removeItem(cacheKey);
-        sessionStorage.removeItem(timestampKey);
-      }, 5 * 60 * 1000);
+      // Cleanup session storage
+      addTimeout(() => {
+        StravaExchangeStorage.cleanup(code);
+      }, ONBOARDING_TIMEOUTS.CLEANUP_DELAY);
       
     } catch (error: any) {
-      console.error('Token exchange failed:', error);
-      
       // Handle different types of errors with better UX
       if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
         // Show timeout-specific onboarding step
         setOnboardingStep('timeout');
-        setTimeout(() => {
+        addTimeout(() => {
           setShowOnboarding(false);
-        }, 4000);
+        }, ONBOARDING_TIMEOUTS.TIMEOUT_DELAY);
       } else {
         setShowOnboarding(false);
       }
       
       // Let the context handle the error display
     } finally {
-      sessionStorage.removeItem(processingKey);
+      StravaExchangeStorage.finishProcessing(code);
     }
-  };
+  }, [navigate, fetchActivities, addTimeout]);
 
   useEffect(() => {
     const initializeDashboard = async () => {
@@ -258,7 +280,7 @@ const EnhancedDashboard: React.FC = () => {
     };
 
     initializeDashboard();
-  }, [code]); // Only re-run when code changes
+  }, [code, handleTokenExchange, fetchActivities]);
 
   // Handle refresh using context
   const handleRefresh = async () => {

@@ -8,8 +8,6 @@ class StravaAPI {
 
   async exchangeCodeForTokens(code) {
     try {
-      console.log('Attempting Strava token exchange with code:', code?.substring(0, 10) + '...');
-      
       // Validate inputs
       if (!code) {
         throw new Error('Authorization code is required');
@@ -32,7 +30,6 @@ class StravaAPI {
         }
       });
 
-      console.log('Strava token exchange successful');
       return response.data;
     } catch (error) {
       console.error('Strava token exchange error details:', {

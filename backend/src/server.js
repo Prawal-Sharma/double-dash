@@ -1,11 +1,11 @@
+// Load and validate environment configuration first
+const config = require('./config/environment');
 const app = require('./app');
 
-const PORT = process.env.PORT || 3001;
-
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🌐 CORS enabled for: ${process.env.NODE_ENV === 'production' ? 'doubledash.ai' : 'localhost:3000'}`);
+const server = app.listen(config.PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on port ${config.PORT}`);
+  console.log(`📍 Environment: ${config.NODE_ENV}`);
+  console.log(`🌐 CORS enabled for: ${config.IS_PRODUCTION ? 'doubledash.ai' : 'localhost:3000'}`);
 });
 
 // Graceful shutdown

@@ -29,8 +29,7 @@ import {
   ErrorMessage,
   Select,
   FormGroup,
-  Label,
-  Badge
+  Label
 } from '../styles/components';
 import styled from 'styled-components';
 

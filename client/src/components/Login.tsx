@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { ThemeProvider } from 'styled-components';
 import config from '../config';
-import { AuthResponse, ApiError } from '../types';
+import { AuthResponse } from '../types';
 import { lightTheme } from '../styles/theme';
 import {
   Container,

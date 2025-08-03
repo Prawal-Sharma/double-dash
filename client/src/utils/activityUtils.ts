@@ -1,5 +1,5 @@
 import { Activity } from '../types';
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, parseISO, subMonths, isWithinInterval } from 'date-fns';
+import { format, startOfWeek, endOfWeek, parseISO, subMonths, isWithinInterval } from 'date-fns';
 
 // Conversion utilities
 export const convertMetersToMiles = (meters: number): number => meters / 1609.34;

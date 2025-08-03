@@ -145,7 +145,6 @@ export const ActivitiesProvider: React.FC<ActivitiesProviderProps> = ({ children
           
           // Check if cache is still valid
           if (data.timestamp && (now - data.timestamp) < CACHE_DURATION) {
-            console.log('Loading activities from cache');
             dispatch({
               type: 'FETCH_SUCCESS',
               payload: {
@@ -186,14 +185,12 @@ export const ActivitiesProvider: React.FC<ActivitiesProviderProps> = ({ children
 
     // Skip fetch if data is fresh and not forced
     if (!forceRefresh && isDataFresh() && state.activities.length > 0) {
-      console.log('Using fresh cached data, skipping API call');
       return;
     }
 
     dispatch({ type: 'FETCH_START' });
 
     try {
-      console.log('Fetching activities from API');
       const response = await axios.get<ActivitiesResponse>(
         `${config.API_BASE_URL}/api/strava/activities`,
         {
@@ -240,7 +237,6 @@ export const ActivitiesProvider: React.FC<ActivitiesProviderProps> = ({ children
     dispatch({ type: 'FETCH_START' });
 
     try {
-      console.log('Refreshing activities from Strava');
       const response = await axios.get<ActivitiesResponse>(
         `${config.API_BASE_URL}/api/strava/activities/refresh`,
         {
