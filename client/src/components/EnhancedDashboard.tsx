@@ -571,6 +571,19 @@ const EnhancedDashboard: React.FC = () => {
                     </Text>
                     <Text size="xs" color="secondary">Time</Text>
                   </div>
+                  <a 
+                    href={`https://www.strava.com/activities/${activity.activityId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: '#FC5200',
+                      textDecoration: 'underline',
+                      fontWeight: 'bold',
+                      fontSize: '14px'
+                    }}
+                  >
+                    View on Strava →
+                  </a>
                 </FlexContainer>
               </FlexContainer>
             ))}
@@ -602,6 +615,42 @@ const EnhancedDashboard: React.FC = () => {
               </Link>
             </Card>
           </Grid>
+          
+          {/* Powered by Strava Footer */}
+          <div style={{
+            marginTop: '60px',
+            paddingTop: '30px',
+            borderTop: '1px solid #e0e0e0',
+            textAlign: 'center'
+          }}>
+            <a 
+              href="https://www.strava.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                textDecoration: 'none',
+                fontSize: '16px',
+                gap: '8px'
+              }}
+            >
+              <span style={{ 
+                color: '#666',
+                fontWeight: '500' 
+              }}>
+                Powered by
+              </span>
+              <span style={{ 
+                color: '#FC5200',
+                fontWeight: '700',
+                fontSize: '18px',
+                letterSpacing: '0.5px'
+              }}>
+                STRAVA
+              </span>
+            </a>
+          </div>
         </Section>
       </Container>
     </ThemeProvider>

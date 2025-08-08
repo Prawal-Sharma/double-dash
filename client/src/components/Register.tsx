@@ -191,9 +191,33 @@ const Register: React.FC = () => {
                   isLoading={isLoading}
                   disabled={isLoading}
                   size="lg"
-                  style={{ width: '100%' }}
+                  style={{ 
+                    width: '100%',
+                    background: '#FC5200',
+                    border: 'none',
+                    padding: '14px 24px',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
                 >
-                  Register & Connect Strava
+                  {isLoading ? (
+                    'Creating Account...'
+                  ) : (
+                    <>
+                      Register & Connect with 
+                      <span style={{ 
+                        fontWeight: '700',
+                        letterSpacing: '0.5px'
+                      }}>
+                        STRAVA
+                      </span>
+                    </>
+                  )}
                 </LoadingButton>
               </FormGroup>
             </form>
