@@ -1,7 +1,8 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { Container, Button } from '../styles/components';
+import HomeDashboard from './HomeDashboard';
 
 // Hero Section Styles
 const HeroSection = styled.section`
@@ -239,36 +240,11 @@ const FooterText = styled.p`
 `;
 
 const Home: React.FC = () => {
-  const navigate = useNavigate();
   const token = localStorage.getItem('jwt');
 
-  const handleLogout = () => {
-    localStorage.removeItem('jwt');
-    navigate('/');
-  };
-
   if (token) {
-    // Logged in view
-    return (
-      <HeroSection style={{ padding: '60px 0' }}>
-        <Container>
-          <HeroTitle>Welcome Back!</HeroTitle>
-          <HeroSubtitle>
-            Ready to check your running progress?
-          </HeroSubtitle>
-          <ButtonGroup>
-            <Link to="/dashboard">
-              <StyledButton variant="primary" size="lg">
-                View Dashboard
-              </StyledButton>
-            </Link>
-            <SecondaryButton onClick={handleLogout} size="lg">
-              Logout
-            </SecondaryButton>
-          </ButtonGroup>
-        </Container>
-      </HeroSection>
-    );
+    // Logged in view - show the enhanced dashboard
+    return <HomeDashboard />;
   }
 
   // Landing page for non-logged in users

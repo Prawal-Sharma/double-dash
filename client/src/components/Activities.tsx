@@ -193,7 +193,7 @@ const Activities: React.FC = () => {
 
     // Add dots where there are gaps
     range.forEach((i) => {
-      if (l) {
+      if (l && typeof i === 'number' && typeof l === 'number') {
         if (i - l === 2) {
           rangeWithDots.push(l + 1);
         } else if (i - l !== 1) {

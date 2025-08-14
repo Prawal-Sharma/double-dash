@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Convert SVG to PNG</title>
+</head>
+<body>
+    <h1>Converting SVG to PNG...</h1>
+    <img id="svgImg" src="dd-logo.svg" style="display: none;">
+    <canvas id="canvas"></canvas>
+    
+    <script>
+        const sizes = [16, 32, 192, 512];
+        let currentIndex = 0;
+        
+        function convertSize(size) {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = size;
+            canvas.height = size;
+            
+            const img = new Image();
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, size, size);
+                
+                canvas.toBlob(function(blob) {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    
+                    if (size === 16 || size === 32) {
+                        a.download = `favicon-${size}.png`;
+                    } else {
+                        a.download = `logo${size}.png`;
+                    }
+                    
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    
+                    currentIndex++;
+                    if (currentIndex < sizes.length) {
+                        setTimeout(() => convertSize(sizes[currentIndex]), 500);
+                    } else {
+                        document.body.innerHTML += '<p>✅ All PNG files generated! Please move them to the public folder and rename favicon-32.png to favicon.ico</p>';
+                    }
+                });
+            };
+            img.src = 'dd-logo.svg';
+        }
+        
+        window.onload = function() {
+            convertSize(sizes[0]);
+        };
+    </script>
+</body>
+</html>
