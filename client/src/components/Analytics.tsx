@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useActivities } from '../contexts/ActivitiesContext';
-import { ThemeProvider } from 'styled-components';
+import { useTheme as useStyledTheme } from 'styled-components';
 import { 
   LineChart, 
   Line, 
@@ -16,7 +16,6 @@ import {
   Legend, 
   ResponsiveContainer 
 } from 'recharts';
-import { lightTheme } from '../styles/theme';
 import { Activity } from '../types';
 import {
   Container,
@@ -29,7 +28,8 @@ import {
   ErrorMessage,
   Select,
   FormGroup,
-  Label
+  Label,
+  Badge
 } from '../styles/components';
 import styled from 'styled-components';
 
@@ -112,10 +112,10 @@ interface AnalyticsData {
 const Analytics: React.FC = () => {
   const { state: activitiesState, fetchActivities } = useActivities();
   const { activities, loading, error } = activitiesState;
+  const theme = useStyledTheme();
   
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [timeRange, setTimeRange] = useState<'all' | '30d' | '90d' | '1y'>('all');
-  const [activityType, setActivityType] = useState<'all' | 'Run' | 'Ride'>('all');
 
   useEffect(() => {
     // Fetch activities using context on mount
@@ -127,7 +127,7 @@ const Analytics: React.FC = () => {
       calculateAnalytics();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activities, timeRange, activityType]);
+  }, [activities, timeRange]);
 
 
   const filterActivitiesByTimeRange = (activities: Activity[]): Activity[] => {
@@ -154,10 +154,7 @@ const Analytics: React.FC = () => {
   const calculateAnalytics = () => {
     let filtered = [...activities];
 
-    // Filter by activity type
-    if (activityType !== 'all') {
-      filtered = filtered.filter(activity => activity.type === activityType);
-    }
+    // All activities are already filtered to running only on backend
 
     // Filter by time range
     filtered = filterActivitiesByTimeRange(filtered);
@@ -351,7 +348,7 @@ const Analytics: React.FC = () => {
   const paceData = preparePaceData();
   const comparisons = calculateComparisons();
 
-  const chartColors = [lightTheme.colors.primary, lightTheme.colors.success, lightTheme.colors.warning, lightTheme.colors.error];
+  const chartColors = [theme.colors.primary, theme.colors.success, theme.colors.warning, theme.colors.error];
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -359,9 +356,9 @@ const Analytics: React.FC = () => {
         <div style={{
           backgroundColor: 'white',
           padding: '12px',
-          border: `1px solid ${lightTheme.colors.border}`,
-          borderRadius: lightTheme.borderRadius.sm,
-          boxShadow: lightTheme.shadows.md
+          border: `1px solid ${theme.colors.border}`,
+          borderRadius: theme.borderRadius.sm,
+          boxShadow: theme.shadows.md
         }}>
           <p style={{ margin: 0, fontWeight: 'bold' }}>{label}</p>
           {payload.map((entry: any, index: number) => (
@@ -377,45 +374,46 @@ const Analytics: React.FC = () => {
 
   if (loading) {
     return (
-      <ThemeProvider theme={lightTheme}>
-        <Container>
-          <FlexContainer direction="column" align="center" style={{ marginTop: '100px' }}>
-            <LoadingSpinner />
-            <Text style={{ marginTop: '16px' }}>Loading your analytics...</Text>
-          </FlexContainer>
-        </Container>
-      </ThemeProvider>
+      <Container>
+        <FlexContainer direction="column" align="center" style={{ marginTop: '100px' }}>
+          <LoadingSpinner />
+          <Text style={{ marginTop: '16px' }}>Loading your running analytics...</Text>
+        </FlexContainer>
+      </Container>
     );
   }
 
   if (error) {
     return (
-      <ThemeProvider theme={lightTheme}>
-        <Container>
-          <ErrorMessage style={{ marginTop: '50px', textAlign: 'center' }}>
-            ⚠️ {error}
-          </ErrorMessage>
-        </Container>
-      </ThemeProvider>
+      <Container>
+        <ErrorMessage style={{ marginTop: '50px', textAlign: 'center' }}>
+          ⚠️ {error}
+        </ErrorMessage>
+      </Container>
     );
   }
 
   if (!analytics) {
     return (
-      <ThemeProvider theme={lightTheme}>
-        <Container>
-          <Text style={{ marginTop: '50px', textAlign: 'center' }}>
-            No analytics data available.
-          </Text>
-        </Container>
-      </ThemeProvider>
+      <Container>
+        <Text style={{ marginTop: '50px', textAlign: 'center' }}>
+          No running analytics data available.
+        </Text>
+      </Container>
     );
   }
 
   return (
-    <ThemeProvider theme={lightTheme}>
-      <Container>
-        <Heading size="lg" style={{ margin: '32px 0' }}>Analytics Dashboard</Heading>
+    <Container>
+      <FlexContainer direction="row" justify="space-between" align="center" style={{ margin: '32px 0' }}>
+        <div>
+          <Heading size="lg">Running Analytics Dashboard</Heading>
+          <Text style={{ color: '#6b7280', marginTop: '8px' }}>Deep insights into your running performance</Text>
+        </div>
+        <Badge style={{ background: '#fc4c02', color: 'white', padding: '8px 16px', fontSize: '14px' }}>
+          🏃 Running Performance Metrics
+        </Badge>
+      </FlexContainer>
         
         {/* Filter Controls */}
         <FilterContainer direction="row" wrap gap="md">
@@ -432,17 +430,6 @@ const Analytics: React.FC = () => {
             </Select>
           </FormGroup>
           
-          <FormGroup style={{ minWidth: '150px', marginBottom: 0 }}>
-            <Label>Activity Type</Label>
-            <Select
-              value={activityType}
-              onChange={(e) => setActivityType(e.target.value as 'all' | 'Run' | 'Ride')}
-            >
-              <option value="all">All Types</option>
-              <option value="Run">Running</option>
-              <option value="Ride">Cycling</option>
-            </Select>
-          </FormGroup>
         </FilterContainer>
 
         {/* Summary Stats */}
@@ -472,17 +459,12 @@ const Analytics: React.FC = () => {
         <Grid columns={2} gap="lg" style={{ marginBottom: '32px' }}>
           <StatsCard>
             <StatNumber>
-              {activityType === 'Run' || (activityType === 'all' && activities.some(a => a.type === 'Run'))
+              {analytics && analytics.avgPace > 0
                 ? `${formatPace(analytics.avgPace)}/mi`
-                : `${formatSpeed(analytics.avgPace)} mph`
+                : '0:00/mi'
               }
             </StatNumber>
-            <StatDescription>
-              {activityType === 'Run' || (activityType === 'all' && activities.some(a => a.type === 'Run'))
-                ? 'Average Pace'
-                : 'Average Speed'
-              }
-            </StatDescription>
+            <StatDescription>Average Pace</StatDescription>
           </StatsCard>
           
           {analytics.avgHeartRate > 0 && (
@@ -547,23 +529,23 @@ const Analytics: React.FC = () => {
             <ChartWrapper>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={lightTheme.colors.border} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={theme.colors.border} />
                   <XAxis 
                     dataKey="month" 
                     tick={{ fontSize: 12 }}
-                    stroke={lightTheme.colors.text.secondary}
+                    stroke={theme.colors.text.secondary}
                   />
                   <YAxis 
                     yAxisId="distance"
                     orientation="left"
                     tick={{ fontSize: 12 }}
-                    stroke={lightTheme.colors.text.secondary}
+                    stroke={theme.colors.text.secondary}
                   />
                   <YAxis 
                     yAxisId="activities"
                     orientation="right"
                     tick={{ fontSize: 12 }}
-                    stroke={lightTheme.colors.text.secondary}
+                    stroke={theme.colors.text.secondary}
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
@@ -571,19 +553,19 @@ const Analytics: React.FC = () => {
                     yAxisId="distance"
                     type="monotone" 
                     dataKey="distance" 
-                    stroke={lightTheme.colors.primary} 
+                    stroke={theme.colors.primary} 
                     strokeWidth={3}
                     name="Distance (miles)"
-                    dot={{ fill: lightTheme.colors.primary, strokeWidth: 2, r: 4 }}
+                    dot={{ fill: theme.colors.primary, strokeWidth: 2, r: 4 }}
                   />
                   <Line 
                     yAxisId="activities"
                     type="monotone" 
                     dataKey="activities" 
-                    stroke={lightTheme.colors.success} 
+                    stroke={theme.colors.success} 
                     strokeWidth={3}
                     name="Activities"
-                    dot={{ fill: lightTheme.colors.success, strokeWidth: 2, r: 4 }}
+                    dot={{ fill: theme.colors.success, strokeWidth: 2, r: 4 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -599,20 +581,20 @@ const Analytics: React.FC = () => {
             <ChartWrapper>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={weeklyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={lightTheme.colors.border} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={theme.colors.border} />
                   <XAxis 
                     dataKey="day" 
                     tick={{ fontSize: 12 }}
-                    stroke={lightTheme.colors.text.secondary}
+                    stroke={theme.colors.text.secondary}
                   />
                   <YAxis 
                     tick={{ fontSize: 12 }}
-                    stroke={lightTheme.colors.text.secondary}
+                    stroke={theme.colors.text.secondary}
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar 
                     dataKey="activities" 
-                    fill={lightTheme.colors.primary}
+                    fill={theme.colors.primary}
                     radius={[4, 4, 0, 0]}
                     name="Activities"
                   />
@@ -663,16 +645,16 @@ const Analytics: React.FC = () => {
                 <ChartWrapper>
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={paceData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={lightTheme.colors.border} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={theme.colors.border} />
                       <XAxis 
                         dataKey="run" 
                         tick={{ fontSize: 10 }}
-                        stroke={lightTheme.colors.text.secondary}
+                        stroke={theme.colors.text.secondary}
                       />
                       <YAxis 
                         domain={['dataMin - 30', 'dataMax + 30']}
                         tick={{ fontSize: 12 }}
-                        stroke={lightTheme.colors.text.secondary}
+                        stroke={theme.colors.text.secondary}
                         tickFormatter={(value) => {
                           const minutes = Math.floor(value / 60);
                           const seconds = Math.floor(value % 60);
@@ -687,15 +669,15 @@ const Analytics: React.FC = () => {
                               <div style={{
                                 backgroundColor: 'white',
                                 padding: '12px',
-                                border: `1px solid ${lightTheme.colors.border}`,
-                                borderRadius: lightTheme.borderRadius.sm,
-                                boxShadow: lightTheme.shadows.md
+                                border: `1px solid ${theme.colors.border}`,
+                                borderRadius: theme.borderRadius.sm,
+                                boxShadow: theme.shadows.md
                               }}>
                                 <p style={{ margin: 0, fontWeight: 'bold' }}>{label}</p>
-                                <p style={{ margin: 0, color: lightTheme.colors.primary }}>
+                                <p style={{ margin: 0, color: theme.colors.primary }}>
                                   Pace: {data.paceDisplay}/mi
                                 </p>
-                                <p style={{ margin: 0, color: lightTheme.colors.text.secondary }}>
+                                <p style={{ margin: 0, color: theme.colors.text.secondary }}>
                                   {data.date}
                                 </p>
                               </div>
@@ -707,9 +689,9 @@ const Analytics: React.FC = () => {
                       <Line 
                         type="monotone" 
                         dataKey="pace" 
-                        stroke={lightTheme.colors.warning} 
+                        stroke={theme.colors.warning} 
                         strokeWidth={2}
-                        dot={{ fill: lightTheme.colors.warning, strokeWidth: 2, r: 3 }}
+                        dot={{ fill: theme.colors.warning, strokeWidth: 2, r: 3 }}
                         name="Pace (seconds/mile)"
                       />
                     </LineChart>
@@ -719,8 +701,7 @@ const Analytics: React.FC = () => {
             )}
           </Grid>
         </Grid>
-      </Container>
-    </ThemeProvider>
+    </Container>
   );
 };
 

@@ -1,19 +1,21 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ThemeProvider } from 'styled-components';
-import { lightTheme } from '../styles/theme';
 import styled from 'styled-components';
+import { useTheme } from '../contexts/ThemeContext';
 
 const NavContainer = styled.nav`
   display: flex;
   padding: ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.lg};
-  background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
-  box-shadow: ${({ theme }) => theme.shadows.md};
+  background: ${({ theme }) => theme.colors.surface};
+  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+  box-shadow: ${({ theme }) => theme.shadows.sm};
   justify-content: space-between;
   align-items: center;
   position: sticky;
   top: 0;
   z-index: 100;
+  backdrop-filter: blur(10px);
+  background: ${({ theme }) => `${theme.colors.surface}ee`};
 `;
 
 const Logo = styled(Link)`
@@ -39,7 +41,7 @@ const NavLinks = styled.div`
 `;
 
 const NavLink = styled(Link)`
-  color: white;
+  color: ${({ theme }) => theme.colors.text.primary};
   text-decoration: none;
   font-size: ${({ theme }) => theme.typography.fontSize.md};
   font-weight: ${({ theme }) => theme.typography.fontWeight.medium};
@@ -48,7 +50,8 @@ const NavLink = styled(Link)`
   transition: all 0.2s ease;
   
   &:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: ${({ theme }) => theme.colors.primary}22;
+    color: ${({ theme }) => theme.colors.primary};
     transform: translateY(-1px);
   }
   
@@ -59,7 +62,7 @@ const NavLink = styled(Link)`
 `;
 
 const LogoutButton = styled.button`
-  color: white;
+  color: ${({ theme }) => theme.colors.primary};
   background: transparent;
   border: 1px solid ${({ theme }) => theme.colors.primary};
   font-size: ${({ theme }) => theme.typography.fontSize.md};
@@ -71,6 +74,7 @@ const LogoutButton = styled.button`
   
   &:hover {
     background-color: ${({ theme }) => theme.colors.primary};
+    color: white;
     transform: translateY(-1px);
   }
   
@@ -80,9 +84,32 @@ const LogoutButton = styled.button`
   }
 `;
 
+const ThemeToggle = styled.button`
+  color: ${({ theme }) => theme.colors.text.primary};
+  background: ${({ theme }) => theme.colors.background};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  font-size: ${({ theme }) => theme.typography.fontSize.xl};
+  padding: ${({ theme }) => theme.spacing.sm};
+  border-radius: ${({ theme }) => theme.borderRadius.round};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.primary}22;
+    border-color: ${({ theme }) => theme.colors.primary};
+    transform: rotate(15deg);
+  }
+`;
+
 const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const token = localStorage.getItem('jwt');
+  const { isDarkMode, toggleTheme } = useTheme();
 
   const handleLogout = () => {
     localStorage.removeItem('jwt');
@@ -90,32 +117,33 @@ const Navbar: React.FC = () => {
   };
 
   return (
-    <ThemeProvider theme={lightTheme}>
-      <NavContainer>
-        <Logo to="/">Double Dash</Logo>
-        <NavLinks>
-          <NavLink to="/">Home</NavLink>
-          {token && (
-            <>
-              <NavLink to="/dashboard">Dashboard</NavLink>
-              <NavLink to="/activities">Activities</NavLink>
-              <NavLink to="/analytics">Analytics</NavLink>
-            </>
-          )}
-          {!token && (
-            <>
-              <NavLink to="/login">Login</NavLink>
-              <NavLink to="/register">Register</NavLink>
-            </>
-          )}
-          {token && (
-            <LogoutButton onClick={handleLogout}>
-              Logout
-            </LogoutButton>
-          )}
-        </NavLinks>
-      </NavContainer>
-    </ThemeProvider>
+    <NavContainer>
+      <Logo to="/">Double Dash</Logo>
+      <NavLinks>
+        <NavLink to="/">Home</NavLink>
+        {token && (
+          <>
+            <NavLink to="/dashboard">Dashboard</NavLink>
+            <NavLink to="/activities">Activities</NavLink>
+            <NavLink to="/analytics">Analytics</NavLink>
+          </>
+        )}
+        {!token && (
+          <>
+            <NavLink to="/login">Login</NavLink>
+            <NavLink to="/register">Register</NavLink>
+          </>
+        )}
+        <ThemeToggle onClick={toggleTheme} title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+          {isDarkMode ? '☀️' : '🌙'}
+        </ThemeToggle>
+        {token && (
+          <LogoutButton onClick={handleLogout}>
+            Logout
+          </LogoutButton>
+        )}
+      </NavLinks>
+    </NavContainer>
   );
 };
 

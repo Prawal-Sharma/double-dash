@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ThemeProvider } from 'styled-components';
 import styled from 'styled-components';
-import { lightTheme } from '../styles/theme';
 import { useActivities } from '../contexts/ActivitiesContext';
 import { Activity } from '../types';
 import {
@@ -17,7 +15,8 @@ import {
   Grid,
   LoadingSpinner,
   ErrorMessage,
-  Badge
+  Badge,
+  Button
 } from '../styles/components';
 
 const ActivityCard = styled(Card)`
@@ -72,7 +71,8 @@ const Activities: React.FC = () => {
   const [filteredActivities, setFilteredActivities] = useState<Activity[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'distance' | 'duration'>('date');
-  const [filterType, setFilterType] = useState<'all' | 'Run' | 'Ride'>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     // Fetch activities using context on mount
@@ -82,7 +82,7 @@ const Activities: React.FC = () => {
   useEffect(() => {
     filterAndSortActivities();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activities, searchTerm, sortBy, filterType]);
+  }, [activities, searchTerm, sortBy]);
 
   const filterAndSortActivities = () => {
     let filtered = [...activities];
@@ -94,10 +94,7 @@ const Activities: React.FC = () => {
       );
     }
 
-    // Apply type filter
-    if (filterType !== 'all') {
-      filtered = filtered.filter(activity => activity.type === filterType);
-    }
+    // All activities are already filtered to running only on backend
 
     // Apply sorting
     filtered.sort((a, b) => {
@@ -150,33 +147,77 @@ const Activities: React.FC = () => {
 
   if (loading) {
     return (
-      <ThemeProvider theme={lightTheme}>
-        <Container>
-          <FlexContainer direction="column" align="center" style={{ marginTop: '100px' }}>
-            <LoadingSpinner />
-            <Text style={{ marginTop: '16px' }}>Loading your activities...</Text>
-          </FlexContainer>
-        </Container>
-      </ThemeProvider>
+      <Container>
+        <FlexContainer direction="column" align="center" style={{ marginTop: '100px' }}>
+          <LoadingSpinner />
+          <Text style={{ marginTop: '16px' }}>Loading your running activities...</Text>
+        </FlexContainer>
+      </Container>
     );
   }
 
   if (error) {
     return (
-      <ThemeProvider theme={lightTheme}>
-        <Container>
-          <ErrorMessage style={{ marginTop: '50px', textAlign: 'center' }}>
-            ⚠️ {error}
-          </ErrorMessage>
-        </Container>
-      </ThemeProvider>
+      <Container>
+        <ErrorMessage style={{ marginTop: '50px', textAlign: 'center' }}>
+          ⚠️ {error}
+        </ErrorMessage>
+      </Container>
     );
   }
 
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredActivities.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentActivities = filteredActivities.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Smart pagination range function
+  const getPaginationRange = (): (number | string)[] => {
+    const delta = 2; // Number of pages to show on each side of current page
+    const range: (number | string)[] = [];
+    const rangeWithDots: (number | string)[] = [];
+    let l: number | undefined;
+
+    // Generate the range of pages to display
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === 1 || i === totalPages || (i >= currentPage - delta && i <= currentPage + delta)) {
+        range.push(i);
+      }
+    }
+
+    // Add dots where there are gaps
+    range.forEach((i) => {
+      if (l) {
+        if (i - l === 2) {
+          rangeWithDots.push(l + 1);
+        } else if (i - l !== 1) {
+          rangeWithDots.push('...');
+        }
+      }
+      rangeWithDots.push(i);
+      l = i as number;
+    });
+
+    return rangeWithDots;
+  };
+
   return (
-    <ThemeProvider theme={lightTheme}>
-      <Container>
-        <Heading size="lg" style={{ margin: '32px 0' }}>Your Activities</Heading>
+    <Container>
+      <FlexContainer direction="row" justify="space-between" align="center" style={{ margin: '32px 0' }}>
+        <div>
+          <Heading size="lg">Your Running Activities</Heading>
+          <Text style={{ color: '#6b7280', marginTop: '8px' }}>Track and analyze your running performance</Text>
+        </div>
+        <Badge style={{ background: '#fc4c02', color: 'white', padding: '8px 16px', fontSize: '14px' }}>
+          🏃 Running Only Platform
+        </Badge>
+      </FlexContainer>
         
         {/* Search and Filter Controls */}
         <SearchContainer direction="row" wrap gap="md">
@@ -188,18 +229,6 @@ const Activities: React.FC = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-          </FormGroup>
-          
-          <FormGroup style={{ minWidth: '150px', marginBottom: 0 }}>
-            <Label>Activity Type</Label>
-            <Select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value as 'all' | 'Run' | 'Ride')}
-            >
-              <option value="all">All Types</option>
-              <option value="Run">Running</option>
-              <option value="Ride">Cycling</option>
-            </Select>
           </FormGroup>
           
           <FormGroup style={{ minWidth: '150px', marginBottom: 0 }}>
@@ -216,13 +245,17 @@ const Activities: React.FC = () => {
         </SearchContainer>
 
         {/* Activities Grid */}
-        {filteredActivities.length === 0 ? (
+        <Text style={{ marginBottom: '16px', color: '#6b7280' }}>
+          Showing {startIndex + 1} - {Math.min(endIndex, filteredActivities.length)} of {filteredActivities.length} runs
+        </Text>
+        
+        {currentActivities.length === 0 ? (
           <Card style={{ textAlign: 'center', marginTop: '32px' }}>
             <Text>No activities found matching your criteria.</Text>
           </Card>
         ) : (
           <Grid columns={1} gap="lg" style={{ marginTop: '32px' }}>
-            {filteredActivities.map((activity) => (
+            {currentActivities.map((activity) => (
               <ActivityCard key={activity.activityId}>
                 <ActivityHeader justify="space-between" align="center">
                   <div>
@@ -263,9 +296,7 @@ const Activities: React.FC = () => {
                         : formatSpeed(activity.average_speed)
                       }
                     </StatValue>
-                    <StatLabel>
-                      {activity.type === 'Run' ? 'Avg Pace' : 'Avg Speed'}
-                    </StatLabel>
+                    <StatLabel>Avg Pace</StatLabel>
                   </StatItem>
                   
                   {activity.average_heartrate && (
@@ -279,8 +310,104 @@ const Activities: React.FC = () => {
             ))}
           </Grid>
         )}
+        
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <Card style={{ marginTop: '40px', marginBottom: '40px', padding: '20px' }}>
+            <FlexContainer direction="column" align="center" gap="md">
+              {/* Page info */}
+              <Text size="sm" color="secondary">
+                Page {currentPage} of {totalPages} • {filteredActivities.length} total runs
+              </Text>
+              
+              {/* Pagination buttons */}
+              <FlexContainer direction="row" justify="center" align="center" gap="xs">
+                {/* First button */}
+                {currentPage > 2 && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => handlePageChange(1)}
+                    style={{ minWidth: '60px' }}
+                  >
+                    First
+                  </Button>
+                )}
+                
+                {/* Previous button */}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  style={{ minWidth: '80px' }}
+                >
+                  Previous
+                </Button>
+                
+                {/* Page numbers */}
+                <FlexContainer direction="row" gap="xs" align="center">
+                  {getPaginationRange().map((item, index) => {
+                    if (item === '...') {
+                      return (
+                        <Text
+                          key={`dots-${index}`}
+                          style={{
+                            padding: '8px 4px',
+                            color: '#9ca3af',
+                            userSelect: 'none'
+                          }}
+                        >
+                          •••
+                        </Text>
+                      );
+                    }
+                    
+                    const pageNum = item as number;
+                    return (
+                      <Button
+                        key={pageNum}
+                        size="sm"
+                        variant={pageNum === currentPage ? 'primary' : 'secondary'}
+                        onClick={() => handlePageChange(pageNum)}
+                        style={{
+                          minWidth: '40px',
+                          fontWeight: pageNum === currentPage ? 'bold' : 'normal'
+                        }}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </FlexContainer>
+                
+                {/* Next button */}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  style={{ minWidth: '80px' }}
+                >
+                  Next
+                </Button>
+                
+                {/* Last button */}
+                {currentPage < totalPages - 1 && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => handlePageChange(totalPages)}
+                    style={{ minWidth: '60px' }}
+                  >
+                    Last
+                  </Button>
+                )}
+              </FlexContainer>
+            </FlexContainer>
+          </Card>
+        )}
       </Container>
-    </ThemeProvider>
   );
 };
 

@@ -1,11 +1,9 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
-import { ThemeProvider } from 'styled-components';
 import styled from 'styled-components';
 import config from '../config';
 import { ActivitiesResponse } from '../types';
-import { lightTheme, darkTheme } from '../styles/theme';
 import { 
   Container, 
   Card, 
@@ -101,31 +99,11 @@ const ErrorContainer = styled.div`
   margin: ${({ theme }) => theme.spacing.xl} 0;
 `;
 
-const ThemeToggle = styled(Button)`
-  position: fixed;
-  top: 80px;
-  right: 20px;
-  z-index: 1000;
-  border-radius: ${({ theme }) => theme.borderRadius.round};
-  width: 50px;
-  height: 50px;
-  padding: 0;
-  font-size: ${({ theme }) => theme.typography.fontSize.lg};
-  
-  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
-    top: 70px;
-    right: 10px;
-    width: 40px;
-    height: 40px;
-    font-size: ${({ theme }) => theme.typography.fontSize.md};
-  }
-`;
 
 const EnhancedDashboard: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { state: activitiesState, fetchActivities, refreshActivities, checkAuthAndRedirect, setOnboarding } = useActivities();
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
   // Extract data from context
   const { activities, summary, loading, error, lastSyncTime } = activitiesState;
@@ -212,19 +190,6 @@ const EnhancedDashboard: React.FC = () => {
     };
   }, [clearAllTimeouts]);
 
-  useEffect(() => {
-    // Check for saved theme preference
-    const savedTheme = LocalStorageManager.getItem('dashboardTheme');
-    if (savedTheme === 'dark') {
-      setIsDarkMode(true);
-    }
-  }, []);
-
-  const toggleTheme = () => {
-    const newTheme = !isDarkMode;
-    setIsDarkMode(newTheme);
-    LocalStorageManager.setItem('dashboardTheme', newTheme ? 'dark' : 'light');
-  };
 
   // Token exchange handler
   const handleTokenExchange = useCallback(async (token: string, code: string): Promise<void> => {
@@ -408,7 +373,6 @@ const EnhancedDashboard: React.FC = () => {
       <StravaOnboardingFlow
         step={onboardingStep}
         activityCount={activities.length}
-        isDarkMode={isDarkMode}
         onComplete={() => setShowOnboarding(false)}
         showContinueButton={showContinueButton}
         onContinue={completeOnboarding}
@@ -426,8 +390,7 @@ const EnhancedDashboard: React.FC = () => {
       return (
         <AuthErrorBoundary 
           error={error}
-          isDarkMode={isDarkMode}
-          onRetry={() => {
+            onRetry={() => {
             // Try to check auth and redirect, or reload
             if (!checkAuthAndRedirect()) {
               window.location.reload();
@@ -439,8 +402,7 @@ const EnhancedDashboard: React.FC = () => {
     
     // Non-auth errors - show regular error container
     return (
-      <ThemeProvider theme={isDarkMode ? darkTheme : lightTheme}>
-        <Container>
+      <Container>
           <ErrorContainer>
             <Heading size="md">⚠️ Error</Heading>
             <Text>{error}</Text>
@@ -448,46 +410,37 @@ const EnhancedDashboard: React.FC = () => {
               Try Again
             </Button>
           </ErrorContainer>
-        </Container>
-      </ThemeProvider>
+      </Container>
     );
   }
 
   if (loading && activities.length === 0) {
     return (
-      <ThemeProvider theme={isDarkMode ? darkTheme : lightTheme}>
-        <Container>
+      <Container>
           <LoadingContainer>
             <LoadingSpinner />
             <Heading size="md">🏃‍♂️ Loading Your Dashboard...</Heading>
             <Text>Getting your latest activities</Text>
           </LoadingContainer>
-        </Container>
-      </ThemeProvider>
+      </Container>
     );
   }
 
   if (activities.length === 0 && !code && !loading) {
     return (
-      <ThemeProvider theme={isDarkMode ? darkTheme : lightTheme}>
-        <Container>
+      <Container>
           <Section>
             <Heading size="xl">🏃‍♂️ Your Running Analytics Dashboard</Heading>
             <Text size="lg" color="secondary">
               No activities found. Please go to <Link to="/">Home</Link> and connect your Strava account.
             </Text>
           </Section>
-        </Container>
-      </ThemeProvider>
+      </Container>
     );
   }
 
   return (
-    <ThemeProvider theme={isDarkMode ? darkTheme : lightTheme}>
-      <Container>
-        <ThemeToggle onClick={toggleTheme} variant="secondary">
-          {isDarkMode ? '☀️' : '🌙'}
-        </ThemeToggle>
+    <Container>
 
         <Section>
           <FlexContainer justify="space-between" align="center" style={{ marginBottom: '32px' }}>
@@ -571,19 +524,6 @@ const EnhancedDashboard: React.FC = () => {
                     </Text>
                     <Text size="xs" color="secondary">Time</Text>
                   </div>
-                  <a 
-                    href={`https://www.strava.com/activities/${activity.activityId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      color: '#FC5200',
-                      textDecoration: 'underline',
-                      fontWeight: 'bold',
-                      fontSize: '14px'
-                    }}
-                  >
-                    View on Strava →
-                  </a>
                 </FlexContainer>
               </FlexContainer>
             ))}
@@ -652,8 +592,7 @@ const EnhancedDashboard: React.FC = () => {
             </a>
           </div>
         </Section>
-      </Container>
-    </ThemeProvider>
+    </Container>
   );
 };
 

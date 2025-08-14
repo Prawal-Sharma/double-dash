@@ -141,15 +141,27 @@ export const lightTheme: Theme = {
 export const darkTheme: Theme = {
   ...lightTheme,
   colors: {
-    ...lightTheme.colors,
-    background: '#1a202c',
-    surface: '#2d3748',
+    primary: '#ff6b35', // Slightly brighter orange for dark mode
+    primaryDark: '#fc4c02',
+    primaryLight: '#ff8c5a',
+    secondary: '#718096',
+    success: '#48bb78',
+    warning: '#ed8936',
+    error: '#fc8181',
+    info: '#4299e1',
+    background: '#0f1114', // Very dark background
+    surface: '#1a1d23', // Slightly lighter for cards/surfaces
     text: {
-      primary: '#f7fafc',
-      secondary: '#a0aec0',
-      disabled: '#718096',
+      primary: '#e2e8f0', // Light gray for primary text
+      secondary: '#a0aec0', // Medium gray for secondary text
+      disabled: '#4a5568', // Dark gray for disabled
     },
-    border: '#4a5568',
-    shadow: 'rgba(0, 0, 0, 0.4)',
+    border: '#2d3748', // Dark border
+    shadow: 'rgba(0, 0, 0, 0.6)',
+  },
+  shadows: {
+    sm: '0 1px 3px rgba(0, 0, 0, 0.3)',
+    md: '0 4px 6px rgba(0, 0, 0, 0.4)',
+    lg: '0 10px 25px rgba(0, 0, 0, 0.5)',
   },
 };

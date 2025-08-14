@@ -1,12 +1,13 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import styled, { ThemeProvider } from 'styled-components';
-import { lightTheme } from '../styles/theme';
+import styled from 'styled-components';
 import { Container, Button } from '../styles/components';
 
 // Hero Section Styles
 const HeroSection = styled.section`
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: ${({ theme }) => theme.colors.background === '#ffffff'
+    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+    : `linear-gradient(135deg, ${theme.colors.primary}66 0%, ${theme.colors.primaryDark}99 100%)`};
   color: white;
   padding: 100px 0;
   text-align: center;
@@ -100,14 +101,14 @@ const SecondaryButton = styled(StyledButton)`
 // Features Section Styles
 const FeaturesSection = styled.section`
   padding: 80px 0;
-  background: #f8f9fa;
+  background: ${({ theme }) => theme.colors.surface};
 `;
 
 const SectionTitle = styled.h2`
   font-size: 2.5rem;
   text-align: center;
   margin-bottom: 3rem;
-  color: #1a202c;
+  color: ${({ theme }) => theme.colors.text.primary};
 
   @media (max-width: 768px) {
     font-size: 2rem;
@@ -122,10 +123,11 @@ const FeaturesGrid = styled.div`
 `;
 
 const FeatureCard = styled.div`
-  background: white;
+  background: ${({ theme }) => theme.colors.background};
   padding: 2rem;
   border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  box-shadow: ${({ theme }) => theme.shadows.sm};
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   text-align: center;
 
@@ -143,18 +145,18 @@ const FeatureIcon = styled.div`
 const FeatureTitle = styled.h3`
   font-size: 1.5rem;
   margin-bottom: 1rem;
-  color: #1a202c;
+  color: ${({ theme }) => theme.colors.text.primary};
 `;
 
 const FeatureDescription = styled.p`
-  color: #4a5568;
+  color: ${({ theme }) => theme.colors.text.secondary};
   line-height: 1.6;
 `;
 
 // Stats Section Styles
 const StatsSection = styled.section`
   padding: 80px 0;
-  background: white;
+  background: ${({ theme }) => theme.colors.background};
 `;
 
 const StatsGrid = styled.div`
@@ -171,19 +173,19 @@ const StatCard = styled.div`
 const StatNumber = styled.div`
   font-size: 2.5rem;
   font-weight: 700;
-  color: #fc4c02;
+  color: ${({ theme }) => theme.colors.primary};
   margin-bottom: 0.5rem;
 `;
 
 const StatLabel = styled.div`
   font-size: 1.1rem;
-  color: #4a5568;
+  color: ${({ theme }) => theme.colors.text.secondary};
 `;
 
 // How It Works Section
 const HowItWorksSection = styled.section`
   padding: 80px 0;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: ${({ theme }) => theme.colors.surface};
 `;
 
 const StepsContainer = styled.div`
@@ -200,7 +202,7 @@ const StepCard = styled.div`
 const StepNumber = styled.div`
   width: 60px;
   height: 60px;
-  background: #fc4c02;
+  background: ${({ theme }) => theme.colors.primary};
   color: white;
   border-radius: 50%;
   display: flex;
@@ -214,25 +216,26 @@ const StepNumber = styled.div`
 const StepTitle = styled.h3`
   font-size: 1.5rem;
   margin-bottom: 1rem;
-  color: #1a202c;
+  color: ${({ theme }) => theme.colors.text.primary};
 `;
 
 const StepDescription = styled.p`
-  color: #4a5568;
+  color: ${({ theme }) => theme.colors.text.secondary};
   line-height: 1.6;
 `;
 
 // Footer Styles
 const Footer = styled.footer`
-  background: #1a202c;
-  color: white;
+  background: ${({ theme }) => theme.colors.surface};
+  color: ${({ theme }) => theme.colors.text.primary};
   padding: 40px 0;
   text-align: center;
+  border-top: 1px solid ${({ theme }) => theme.colors.border};
 `;
 
 const FooterText = styled.p`
   margin: 0.5rem 0;
-  opacity: 0.8;
+  color: ${({ theme }) => theme.colors.text.secondary};
 `;
 
 const Home: React.FC = () => {
@@ -247,32 +250,30 @@ const Home: React.FC = () => {
   if (token) {
     // Logged in view
     return (
-      <ThemeProvider theme={lightTheme}>
-        <HeroSection style={{ padding: '60px 0' }}>
-          <Container>
-            <HeroTitle>Welcome Back!</HeroTitle>
-            <HeroSubtitle>
-              Ready to check your running progress?
-            </HeroSubtitle>
-            <ButtonGroup>
-              <Link to="/dashboard">
-                <StyledButton variant="primary" size="lg">
-                  View Dashboard
-                </StyledButton>
-              </Link>
-              <SecondaryButton onClick={handleLogout} size="lg">
-                Logout
-              </SecondaryButton>
-            </ButtonGroup>
-          </Container>
-        </HeroSection>
-      </ThemeProvider>
+      <HeroSection style={{ padding: '60px 0' }}>
+        <Container>
+          <HeroTitle>Welcome Back!</HeroTitle>
+          <HeroSubtitle>
+            Ready to check your running progress?
+          </HeroSubtitle>
+          <ButtonGroup>
+            <Link to="/dashboard">
+              <StyledButton variant="primary" size="lg">
+                View Dashboard
+              </StyledButton>
+            </Link>
+            <SecondaryButton onClick={handleLogout} size="lg">
+              Logout
+            </SecondaryButton>
+          </ButtonGroup>
+        </Container>
+      </HeroSection>
     );
   }
 
   // Landing page for non-logged in users
   return (
-    <ThemeProvider theme={lightTheme}>
+    <>
       {/* Hero Section */}
       <HeroSection>
         <Container>
@@ -323,9 +324,9 @@ const Home: React.FC = () => {
             </FeatureCard>
             <FeatureCard>
               <FeatureIcon>🏃</FeatureIcon>
-              <FeatureTitle>Activity Sync</FeatureTitle>
+              <FeatureTitle>Strava Sync</FeatureTitle>
               <FeatureDescription>
-                Automatic synchronization of all your running activities with real-time updates.
+                Automatic synchronization of all your Strava running activities with real-time updates.
               </FeatureDescription>
             </FeatureCard>
             <FeatureCard>
@@ -380,7 +381,7 @@ const Home: React.FC = () => {
               <StepNumber>1</StepNumber>
               <StepTitle>Connect</StepTitle>
               <StepDescription>
-                Create your account and connect your running data source in seconds.
+                Create your account and connect your Strava account in seconds.
               </StepDescription>
             </StepCard>
             <StepCard>
@@ -425,7 +426,7 @@ const Home: React.FC = () => {
           </FooterText>
         </Container>
       </Footer>
-    </ThemeProvider>
+    </>
   );
 };
 

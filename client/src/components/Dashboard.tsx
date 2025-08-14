@@ -413,28 +413,6 @@ const Dashboard: React.FC = () => {
                 </div>
               )}
             </div>
-            
-            {/* View on Strava link */}
-            <div style={{ 
-              marginTop: '15px', 
-              paddingTop: '15px',
-              borderTop: '1px solid #eee',
-              textAlign: 'right'
-            }}>
-              <a 
-                href={`https://www.strava.com/activities/${activity.activityId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  color: '#FC5200',
-                  textDecoration: 'underline',
-                  fontWeight: 'bold',
-                  fontSize: '14px'
-                }}
-              >
-                View on Strava →
-              </a>
-            </div>
           </div>
         ))}
       </div>
