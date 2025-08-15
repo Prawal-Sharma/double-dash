@@ -258,7 +258,7 @@ const HomeDashboard: React.FC = () => {
 
     // Calculate last run days ago
     const lastRunDaysAgo = sortedActivities.length > 0
-      ? Math.floor((now.getTime() - new Date(sortedActivities[0].start_date).getTime()) / (24 * 60 * 60 * 1000))
+      ? Math.floor((now.getTime() - new Date(sortedActivities[sortedActivities.length - 1].start_date).getTime()) / (24 * 60 * 60 * 1000))
       : -1;
 
     // Weekly goal progress (default 20 miles/week)
@@ -275,7 +275,7 @@ const HomeDashboard: React.FC = () => {
       averagePace,
       lastRunDaysAgo,
       weeklyGoalProgress,
-      recentActivities: sortedActivities.slice(0, 5)
+      recentActivities: sortedActivities.slice(-5).reverse()
     });
   };
 

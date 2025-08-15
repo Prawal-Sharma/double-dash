@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
 import { Activity } from '../../types';
 import {
@@ -12,7 +12,6 @@ import {
 } from '../../styles/components';
 import CalendarHeatmap from 'react-calendar-heatmap';
 import 'react-calendar-heatmap/dist/styles.css';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 const StatsCard = styled(Card)`
   text-align: center;
@@ -74,9 +73,46 @@ const ProgressBar = styled.div<{ progress: number; color?: string }>`
 `;
 
 const GoalCard = styled.div`
-  padding: ${({ theme }) => theme.spacing.md};
+  padding: ${({ theme }) => theme.spacing.lg};
   background: ${({ theme }) => theme.colors.surface};
   border-radius: ${({ theme }) => theme.borderRadius.md};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  transition: all 0.2s ease;
+  
+  &:hover {
+    box-shadow: ${({ theme }) => theme.shadows.md};
+  }
+`;
+
+const GoalInput = styled.input`
+  width: 80px;
+  padding: ${({ theme }) => theme.spacing.xs} ${({ theme }) => theme.spacing.sm};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.borderRadius.sm};
+  font-size: ${({ theme }) => theme.typography.fontSize.md};
+  font-weight: ${({ theme }) => theme.typography.fontWeight.bold};
+  text-align: center;
+  background: ${({ theme }) => theme.colors.background};
+  
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: 0 0 0 2px ${({ theme }) => theme.colors.primary}15;
+  }
+`;
+
+const GoalEditButton = styled.button`
+  background: none;
+  border: none;
+  color: ${({ theme }) => theme.colors.primary};
+  cursor: pointer;
+  padding: ${({ theme }) => theme.spacing.xs};
+  margin-left: ${({ theme }) => theme.spacing.sm};
+  font-size: ${({ theme }) => theme.typography.fontSize.md};
+  
+  &:hover {
+    opacity: 0.7;
+  }
 `;
 
 const StreakCard = styled(Card)`
@@ -91,6 +127,18 @@ interface OverviewTabProps {
 }
 
 const OverviewTab: React.FC<OverviewTabProps> = ({ activities, analyticsData }) => {
+  // Goal state management
+  const [editingGoal, setEditingGoal] = useState<'weekly' | 'monthly' | 'yearly' | null>(null);
+  const [weeklyGoal, setWeeklyGoal] = useState(parseFloat(localStorage.getItem('weeklyMileGoal') || '20'));
+  const [monthlyGoal, setMonthlyGoal] = useState(parseFloat(localStorage.getItem('monthlyMileGoal') || '80'));
+  const [yearlyGoal, setYearlyGoal] = useState(parseFloat(localStorage.getItem('yearlyMileGoal') || '1000'));
+  
+  const saveGoal = (type: 'weekly' | 'monthly' | 'yearly', value: number) => {
+    const key = `${type}MileGoal`;
+    localStorage.setItem(key, value.toString());
+    setEditingGoal(null);
+  };
+  
   // Calculate week-over-week changes
   const now = new Date();
   const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -105,11 +153,6 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ activities, analyticsData }) 
   const thisWeekMiles = thisWeekActivities.reduce((sum, a) => sum + a.distance, 0) * 0.000621371;
   const lastWeekMiles = lastWeekActivities.reduce((sum, a) => sum + a.distance, 0) * 0.000621371;
   const weekChange = lastWeekMiles > 0 ? ((thisWeekMiles - lastWeekMiles) / lastWeekMiles * 100) : 0;
-  
-  // Calculate goal progress
-  const weeklyGoal = parseFloat(localStorage.getItem('weeklyMileGoal') || '20');
-  const monthlyGoal = parseFloat(localStorage.getItem('monthlyMileGoal') || '80');
-  const yearlyGoal = parseFloat(localStorage.getItem('yearlyMileGoal') || '1000');
   
   const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const oneYearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
@@ -137,19 +180,6 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ activities, analyticsData }) 
     return acc;
   }, []);
   
-  // Activity type distribution
-  const typeDistribution = activities.reduce((acc: any, activity) => {
-    const type = activity.type || 'Run';
-    acc[type] = (acc[type] || 0) + 1;
-    return acc;
-  }, {});
-  
-  const pieData = Object.entries(typeDistribution).map(([name, value]) => ({
-    name,
-    value: value as number
-  }));
-  
-  const COLORS = ['#fc4c02', '#10b981', '#f59e0b', '#8b5cf6'];
   
   return (
     <>
@@ -189,39 +219,120 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ activities, analyticsData }) 
       
       {/* Goals & Progress */}
       <SectionCard>
-        <SectionTitle size="md">Goals & Progress</SectionTitle>
+        <FlexContainer justify="space-between" align="center" style={{ marginBottom: '24px' }}>
+          <SectionTitle size="md" style={{ margin: 0 }}>Goals & Progress</SectionTitle>
+          <Text size="sm" color="secondary">Click the edit icon to update your goals</Text>
+        </FlexContainer>
         <Grid columns={{ xs: 1, sm: 1, md: 3 }} gap="lg">
           <GoalCard>
-            <Text size="sm" weight="semiBold">Weekly Goal</Text>
-            <Text size="lg" weight="bold" style={{ margin: '8px 0' }}>
-              {thisWeekMiles.toFixed(1)} / {weeklyGoal} miles
-            </Text>
+            <FlexContainer justify="space-between" align="center" style={{ marginBottom: '12px' }}>
+              <Text size="sm" weight="semiBold">Weekly Goal</Text>
+              <GoalEditButton 
+                onClick={() => setEditingGoal(editingGoal === 'weekly' ? null : 'weekly')}
+                title="Edit weekly goal"
+              >
+                ✏️
+              </GoalEditButton>
+            </FlexContainer>
+            {editingGoal === 'weekly' ? (
+              <FlexContainer align="center" gap="sm" style={{ margin: '8px 0' }}>
+                <Text size="lg">{thisWeekMiles.toFixed(1)} /</Text>
+                <GoalInput 
+                  type="number" 
+                  value={weeklyGoal}
+                  onChange={(e) => setWeeklyGoal(parseFloat(e.target.value) || 0)}
+                  onBlur={() => saveGoal('weekly', weeklyGoal)}
+                  onKeyDown={(e) => e.key === 'Enter' && saveGoal('weekly', weeklyGoal)}
+                  autoFocus
+                />
+                <Text size="lg">miles</Text>
+              </FlexContainer>
+            ) : (
+              <Text size="lg" weight="bold" style={{ margin: '8px 0' }}>
+                {thisWeekMiles.toFixed(1)} / {weeklyGoal} miles
+              </Text>
+            )}
             <ProgressBar progress={(thisWeekMiles / weeklyGoal) * 100} />
-            <Text size="xs" color="secondary">
-              {((thisWeekMiles / weeklyGoal) * 100).toFixed(0)}% complete
-            </Text>
+            <FlexContainer justify="space-between" align="center" style={{ marginTop: '8px' }}>
+              <Text size="xs" color="secondary">
+                {((thisWeekMiles / weeklyGoal) * 100).toFixed(0)}% complete
+              </Text>
+              {thisWeekMiles >= weeklyGoal && <Badge variant="success">Goal Met! 🎉</Badge>}
+            </FlexContainer>
           </GoalCard>
           
           <GoalCard>
-            <Text size="sm" weight="semiBold">Monthly Goal</Text>
-            <Text size="lg" weight="bold" style={{ margin: '8px 0' }}>
-              {monthlyMiles.toFixed(1)} / {monthlyGoal} miles
-            </Text>
+            <FlexContainer justify="space-between" align="center" style={{ marginBottom: '12px' }}>
+              <Text size="sm" weight="semiBold">Monthly Goal</Text>
+              <GoalEditButton 
+                onClick={() => setEditingGoal(editingGoal === 'monthly' ? null : 'monthly')}
+                title="Edit monthly goal"
+              >
+                ✏️
+              </GoalEditButton>
+            </FlexContainer>
+            {editingGoal === 'monthly' ? (
+              <FlexContainer align="center" gap="sm" style={{ margin: '8px 0' }}>
+                <Text size="lg">{monthlyMiles.toFixed(1)} /</Text>
+                <GoalInput 
+                  type="number" 
+                  value={monthlyGoal}
+                  onChange={(e) => setMonthlyGoal(parseFloat(e.target.value) || 0)}
+                  onBlur={() => saveGoal('monthly', monthlyGoal)}
+                  onKeyDown={(e) => e.key === 'Enter' && saveGoal('monthly', monthlyGoal)}
+                  autoFocus
+                />
+                <Text size="lg">miles</Text>
+              </FlexContainer>
+            ) : (
+              <Text size="lg" weight="bold" style={{ margin: '8px 0' }}>
+                {monthlyMiles.toFixed(1)} / {monthlyGoal} miles
+              </Text>
+            )}
             <ProgressBar progress={(monthlyMiles / monthlyGoal) * 100} color="#f59e0b" />
-            <Text size="xs" color="secondary">
-              {((monthlyMiles / monthlyGoal) * 100).toFixed(0)}% complete
-            </Text>
+            <FlexContainer justify="space-between" align="center" style={{ marginTop: '8px' }}>
+              <Text size="xs" color="secondary">
+                {((monthlyMiles / monthlyGoal) * 100).toFixed(0)}% complete
+              </Text>
+              {monthlyMiles >= monthlyGoal && <Badge variant="success">Goal Met! 🎉</Badge>}
+            </FlexContainer>
           </GoalCard>
           
           <GoalCard>
-            <Text size="sm" weight="semiBold">Yearly Goal</Text>
-            <Text size="lg" weight="bold" style={{ margin: '8px 0' }}>
-              {yearlyMiles.toFixed(0)} / {yearlyGoal} miles
-            </Text>
+            <FlexContainer justify="space-between" align="center" style={{ marginBottom: '12px' }}>
+              <Text size="sm" weight="semiBold">Yearly Goal</Text>
+              <GoalEditButton 
+                onClick={() => setEditingGoal(editingGoal === 'yearly' ? null : 'yearly')}
+                title="Edit yearly goal"
+              >
+                ✏️
+              </GoalEditButton>
+            </FlexContainer>
+            {editingGoal === 'yearly' ? (
+              <FlexContainer align="center" gap="sm" style={{ margin: '8px 0' }}>
+                <Text size="lg">{yearlyMiles.toFixed(0)} /</Text>
+                <GoalInput 
+                  type="number" 
+                  value={yearlyGoal}
+                  onChange={(e) => setYearlyGoal(parseFloat(e.target.value) || 0)}
+                  onBlur={() => saveGoal('yearly', yearlyGoal)}
+                  onKeyDown={(e) => e.key === 'Enter' && saveGoal('yearly', yearlyGoal)}
+                  autoFocus
+                />
+                <Text size="lg">miles</Text>
+              </FlexContainer>
+            ) : (
+              <Text size="lg" weight="bold" style={{ margin: '8px 0' }}>
+                {yearlyMiles.toFixed(0)} / {yearlyGoal} miles
+              </Text>
+            )}
             <ProgressBar progress={(yearlyMiles / yearlyGoal) * 100} color="#10b981" />
-            <Text size="xs" color="secondary">
-              {((yearlyMiles / yearlyGoal) * 100).toFixed(0)}% complete
-            </Text>
+            <FlexContainer justify="space-between" align="center" style={{ marginTop: '8px' }}>
+              <Text size="xs" color="secondary">
+                {((yearlyMiles / yearlyGoal) * 100).toFixed(0)}% complete
+              </Text>
+              {yearlyMiles >= yearlyGoal && <Badge variant="success">Goal Met! 🎉</Badge>}
+            </FlexContainer>
           </GoalCard>
         </Grid>
       </SectionCard>
@@ -285,61 +396,85 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ activities, analyticsData }) 
         </div>
       </SectionCard>
       
-      {/* Activity Distribution */}
-      {pieData.length > 0 && (
-        <Grid columns={{ xs: 1, sm: 1, md: 2 }} gap="lg">
-          <SectionCard>
-            <SectionTitle size="md">Activity Types</SectionTitle>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-            <FlexContainer justify="center" gap="md" style={{ marginTop: '16px' }}>
-              {pieData.map((entry, index) => (
-                <FlexContainer key={entry.name} align="center" gap="xs">
-                  <div style={{ 
-                    width: '12px', 
-                    height: '12px', 
-                    background: COLORS[index % COLORS.length],
-                    borderRadius: '2px'
-                  }} />
-                  <Text size="sm">{entry.name} ({entry.value})</Text>
+      {/* Recent Performance and Quick Actions */}
+      <Grid columns={{ xs: 1, sm: 1, md: 2 }} gap="lg">
+        <SectionCard>
+          <SectionTitle size="md">Recent Performance</SectionTitle>
+          <FlexContainer direction="column" gap="md">
+            {activities.slice(0, 3).map((activity, index) => (
+              <div key={activity.activityId} style={{
+                padding: '12px',
+                background: index === 0 ? 'linear-gradient(135deg, #fc4c0210 0%, transparent 100%)' : '#f9fafb',
+                borderRadius: '8px',
+                borderLeft: `3px solid ${index === 0 ? '#fc4c02' : '#e5e7eb'}`
+              }}>
+                <FlexContainer justify="space-between" align="center">
+                  <div>
+                    <Text size="sm" weight="semiBold">{activity.name}</Text>
+                    <Text size="xs" color="secondary">
+                      {new Date(activity.start_date).toLocaleDateString()} • 
+                      {' '}{(activity.distance * 0.000621371).toFixed(1)} mi
+                    </Text>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <Text size="sm" weight="semiBold">
+                      {activity.average_speed > 0 
+                        ? `${Math.floor(1609.34 / activity.average_speed / 60)}:${Math.floor((1609.34 / activity.average_speed) % 60).toString().padStart(2, '0')}`
+                        : '--'}/mi
+                    </Text>
+                    {activity.pr_count > 0 && (
+                      <Badge variant="success" style={{ marginTop: '4px' }}>
+                        {activity.pr_count} PR{activity.pr_count > 1 ? 's' : ''}
+                      </Badge>
+                    )}
+                  </div>
                 </FlexContainer>
-              ))}
-            </FlexContainer>
-          </SectionCard>
-          
-          <SectionCard>
-            <SectionTitle size="md">Quick Actions</SectionTitle>
-            <FlexContainer direction="column" gap="md">
-              <Button variant="primary" style={{ width: '100%' }}>
-                📊 Export Data
-              </Button>
-              <Button variant="secondary" style={{ width: '100%' }}>
-                🎯 Update Goals
-              </Button>
-              <Button variant="secondary" style={{ width: '100%' }}>
-                🔄 Sync Activities
-              </Button>
-            </FlexContainer>
-          </SectionCard>
-        </Grid>
-      )}
+              </div>
+            ))}
+            {activities.length === 0 && (
+              <Text size="sm" color="secondary" style={{ textAlign: 'center', padding: '20px 0' }}>
+                No recent activities
+              </Text>
+            )}
+          </FlexContainer>
+        </SectionCard>
+        
+        <SectionCard>
+          <SectionTitle size="md">Quick Actions</SectionTitle>
+          <Button 
+            variant="primary" 
+            style={{ width: '100%' }}
+            onClick={() => {
+              // Export activities data as CSV
+              const csvContent = [
+                ['Date', 'Name', 'Distance (mi)', 'Duration', 'Pace (/mi)', 'Elevation (ft)'].join(','),
+                ...activities.map(a => [
+                  new Date(a.start_date).toLocaleDateString(),
+                  `"${a.name}"`,
+                  (a.distance * 0.000621371).toFixed(2),
+                  Math.floor(a.moving_time / 60) + ':' + (a.moving_time % 60).toString().padStart(2, '0'),
+                  a.average_speed > 0 
+                    ? `${Math.floor(1609.34 / a.average_speed / 60)}:${Math.floor((1609.34 / a.average_speed) % 60).toString().padStart(2, '0')}`
+                    : '--',
+                  Math.round(a.total_elevation_gain * 3.28084)
+                ].join(','))
+              ].join('\n');
+              
+              const blob = new Blob([csvContent], { type: 'text/csv' });
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `running_data_${new Date().toISOString().split('T')[0]}.csv`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              window.URL.revokeObjectURL(url);
+            }}
+          >
+            📊 Export Data (CSV)
+          </Button>
+        </SectionCard>
+      </Grid>
     </>
   );
 };

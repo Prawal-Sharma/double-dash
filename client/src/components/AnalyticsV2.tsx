@@ -297,10 +297,99 @@ const AnalyticsV2: React.FC = () => {
     const totalElevation = filteredActivities.reduce((sum, a) => sum + a.total_elevation_gain, 0);
     const avgPace = filteredActivities.reduce((sum, a) => sum + a.average_speed, 0) / filteredActivities.length;
     
-    // Calculate streaks (simplified for now)
-    const currentStreak = 0; // Will be calculated properly
-    const longestStreak = 0; // Will be calculated properly
-    const consistencyScore = Math.min(100, (filteredActivities.length / 12) * 100); // Simple consistency
+    // Calculate consistency score based on running frequency
+    const calculateConsistency = () => {
+      if (filteredActivities.length === 0) return 0;
+      
+      // Group activities by week
+      const weekMap = new Map<string, number>();
+      filteredActivities.forEach(activity => {
+        const date = new Date(activity.start_date);
+        const weekStart = new Date(date.setDate(date.getDate() - date.getDay()));
+        const weekKey = weekStart.toISOString().split('T')[0];
+        weekMap.set(weekKey, (weekMap.get(weekKey) || 0) + 1);
+      });
+      
+      // Calculate total weeks in range
+      const sortedActivities = [...filteredActivities].sort((a, b) => 
+        new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
+      );
+      
+      if (sortedActivities.length === 0) return 0;
+      
+      const firstDate = new Date(sortedActivities[0].start_date);
+      const lastDate = new Date(sortedActivities[sortedActivities.length - 1].start_date);
+      const totalWeeks = Math.max(1, Math.ceil((lastDate.getTime() - firstDate.getTime()) / (7 * 24 * 60 * 60 * 1000)));
+      
+      // Consistency = percentage of weeks with at least one run
+      const weeksWithRuns = weekMap.size;
+      const consistency = Math.min(100, Math.round((weeksWithRuns / totalWeeks) * 100));
+      
+      return consistency;
+    };
+    
+    // Calculate streaks
+    const calculateStreaks = () => {
+      if (filteredActivities.length === 0) return { current: 0, longest: 0 };
+      
+      const sortedActivities = [...filteredActivities].sort((a, b) => 
+        new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
+      );
+      
+      // Create set of unique run days
+      const runDays = new Set<string>();
+      sortedActivities.forEach(activity => {
+        const date = new Date(activity.start_date);
+        runDays.add(`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`);
+      });
+      
+      // Convert to sorted array of dates
+      const uniqueDays = Array.from(runDays).map(dateStr => {
+        const [year, month, day] = dateStr.split('-').map(Number);
+        return new Date(year, month, day);
+      }).sort((a, b) => a.getTime() - b.getTime());
+      
+      if (uniqueDays.length === 0) return { current: 0, longest: 0 };
+      
+      // Calculate longest streak
+      let longestStreak = 1;
+      let tempStreak = 1;
+      
+      for (let i = 1; i < uniqueDays.length; i++) {
+        const daysDiff = Math.floor((uniqueDays[i].getTime() - uniqueDays[i-1].getTime()) / (24 * 60 * 60 * 1000));
+        if (daysDiff === 1) {
+          tempStreak++;
+        } else {
+          longestStreak = Math.max(longestStreak, tempStreak);
+          tempStreak = 1;
+        }
+      }
+      longestStreak = Math.max(longestStreak, tempStreak);
+      
+      // Calculate current streak
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const lastRunDate = uniqueDays[uniqueDays.length - 1];
+      const daysSinceLastRun = Math.floor((today.getTime() - lastRunDate.getTime()) / (24 * 60 * 60 * 1000));
+      
+      let currentStreak = 0;
+      if (daysSinceLastRun <= 1) {
+        currentStreak = 1;
+        for (let i = uniqueDays.length - 2; i >= 0; i--) {
+          const daysDiff = Math.floor((uniqueDays[i + 1].getTime() - uniqueDays[i].getTime()) / (24 * 60 * 60 * 1000));
+          if (daysDiff === 1) {
+            currentStreak++;
+          } else {
+            break;
+          }
+        }
+      }
+      
+      return { current: currentStreak, longest: longestStreak };
+    };
+    
+    const streaks = calculateStreaks();
+    const consistencyScore = calculateConsistency();
     
     setAnalyticsData({
       totalDistance,
@@ -308,8 +397,8 @@ const AnalyticsV2: React.FC = () => {
       totalElevation,
       totalActivities: filteredActivities.length,
       avgPace,
-      currentStreak,
-      longestStreak,
+      currentStreak: streaks.current,
+      longestStreak: streaks.longest,
       consistencyScore
     });
   }, [filteredActivities]);
