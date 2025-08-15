@@ -4,7 +4,7 @@ import Navbar from './components/Navbar';
 import Home from './components/Home';
 import EnhancedDashboard from './components/EnhancedDashboard';
 import Activities from './components/Activities';
-import Analytics from './components/Analytics';
+import AnalyticsV2 from './components/AnalyticsV2';
 import StravaAuthFailure from './components/StravaAuthFailure';
 import StravaCallback from './components/StravaCallback';
 import Login from './components/Login';
@@ -22,7 +22,7 @@ const App: React.FC = () => {
             <Route path="/" element={<Home />} />
             <Route path="/dashboard" element={<EnhancedDashboard />} />
             <Route path="/activities" element={<Activities />} />
-            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/analytics" element={<AnalyticsV2 />} />
             <Route path="/auth-failure" element={<StravaAuthFailure />} />
             <Route path="/strava-callback" element={<StravaCallback />} />
             <Route path="/exchange_token" element={<EnhancedDashboard />} />
