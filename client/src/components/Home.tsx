@@ -385,11 +385,13 @@ const Home: React.FC = () => {
           <HeroSubtitle style={{ fontSize: '1.2rem', marginBottom: '2rem' }}>
             Join runners who are already transforming their performance
           </HeroSubtitle>
-          <Link to="/register">
-            <StyledButton size="lg" style={{ background: 'white', color: '#fc4c02' }}>
-              Get Started Now
-            </StyledButton>
-          </Link>
+          <ButtonGroup>
+            <Link to="/register" style={{ textDecoration: 'none' }}>
+              <StyledButton size="lg" style={{ background: 'white', color: '#fc4c02' }}>
+                Get Started Now
+              </StyledButton>
+            </Link>
+          </ButtonGroup>
         </Container>
       </HeroSection>
 

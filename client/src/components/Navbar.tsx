@@ -113,7 +113,8 @@ const Navbar: React.FC = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('jwt');
-    navigate('/');
+    // Force a page reload to ensure all components re-check authentication status
+    window.location.href = '/';
   };
 
   return (

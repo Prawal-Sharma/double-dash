@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { ThemeProvider } from 'styled-components';
 import config from '../config';
-import { AuthResponse } from '../types';
 import { lightTheme } from '../styles/theme';
+import { saveRegistrationData } from '../utils/registrationStorage';
 import {
   Container,
   FormCard,
@@ -28,7 +28,7 @@ const Register: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [registrationStep, setRegistrationStep] = useState<'form' | 'registering' | 'strava-auth'>('form');
+  const [registrationStep, setRegistrationStep] = useState<'form' | 'validating' | 'strava-redirect'>('form');
 
   // Get clientID from environment variable
   const clientID = process.env.REACT_APP_STRAVA_CLIENT_ID;
@@ -37,73 +37,102 @@ const Register: React.FC = () => {
     console.error('REACT_APP_STRAVA_CLIENT_ID environment variable is not set');
   }
   
-  const redirectURI = `${config.FRONTEND_URL}/dashboard`;
+  // Updated redirect URI to point to our callback handler
+  const redirectURI = `${config.FRONTEND_URL}/strava-callback`;
   const scope = 'read,activity:read';
-  const stravaAuthURL = `https://www.strava.com/oauth/authorize?client_id=${clientID}&response_type=code&redirect_uri=${redirectURI}&approval_prompt=force&scope=${scope}`;
+  const stravaAuthURL = `https://www.strava.com/oauth/authorize?client_id=${clientID}&response_type=code&redirect_uri=${redirectURI}&approval_prompt=force&scope=${scope}&state=registration`;
+
+  const validatePassword = (password: string): string[] => {
+    const errors: string[] = [];
+    
+    if (password.length < 8) {
+      errors.push('Password must be at least 8 characters');
+    }
+    if (!/[A-Z]/.test(password)) {
+      errors.push('Password must contain at least one uppercase letter');
+    }
+    if (!/[a-z]/.test(password)) {
+      errors.push('Password must contain at least one lowercase letter');
+    }
+    if (!/[0-9]/.test(password)) {
+      errors.push('Password must contain at least one number');
+    }
+    if (!/[!@#$%^&*]/.test(password)) {
+      errors.push('Password must contain at least one special character (!@#$%^&*)');
+    }
+    
+    return errors;
+  };
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
 
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
     setSuccess('');
     setIsLoading(true);
-    setRegistrationStep('registering');
+    setRegistrationStep('validating');
 
     try {
-      // Step 1: Register the user
-      const registerResponse = await axios.post<AuthResponse>(`${config.API_BASE_URL}/api/auth/register`, { email, password });
-
-      if (registerResponse.data.message === 'User registered successfully') {
-        setSuccess('Account created successfully!');
-        
-        // Step 2: Automatically login to get JWT
-        const loginResponse = await axios.post<AuthResponse>(`${config.API_BASE_URL}/api/auth/login`, { email, password });
-        const { token } = loginResponse.data;
-        localStorage.setItem('jwt', token);
-
-        // Step 3: Prepare for Strava authorization
-        setRegistrationStep('strava-auth');
-        setSuccess('Preparing Strava connection...');
-        
-        // Give user a moment to see the progress, then redirect
-        setTimeout(() => {
-          window.location.href = stravaAuthURL;
-        }, 1500);
+      // Step 1: Validate email format
+      if (!validateEmail(email)) {
+        setError('Please enter a valid email address');
+        setIsLoading(false);
+        setRegistrationStep('form');
+        return;
       }
+
+      // Step 2: Validate password strength
+      const passwordErrors = validatePassword(password);
+      if (passwordErrors.length > 0) {
+        setError(passwordErrors.join('. '));
+        setIsLoading(false);
+        setRegistrationStep('form');
+        return;
+      }
+
+      // Step 3: Check if email already exists (optional - can skip this for true 2-phase)
+      try {
+        const checkResponse = await axios.post(`${config.API_BASE_URL}/api/auth/check-email`, { email });
+        if (checkResponse.data.exists) {
+          setError('An account with this email already exists. Please login instead.');
+          setIsLoading(false);
+          setRegistrationStep('form');
+          return;
+        }
+      } catch (checkError) {
+        // If check fails, continue anyway (backend might not have this endpoint yet)
+        console.log('Email check skipped:', checkError);
+      }
+
+      // Step 4: Save registration data temporarily
+      saveRegistrationData(email, password);
+      
+      // Step 5: Prepare for Strava redirect
+      setRegistrationStep('strava-redirect');
+      setSuccess('Redirecting to Strava for authorization...');
+      
+      // Step 6: Redirect to Strava
+      setTimeout(() => {
+        window.location.href = stravaAuthURL;
+      }, 1500);
+      
     } catch (err: any) {
       setIsLoading(false);
       setRegistrationStep('form');
-      console.error('Register error:', err);
-      
-      // Handle specific error types
-      if (err.response?.status === 400) {
-        const errorData = err.response.data;
-        
-        // Handle validation errors
-        if (errorData.code === 'VALIDATION_ERROR' && errorData.details) {
-          const messages = errorData.details.map((detail: any) => detail.message).join(', ');
-          setError(`Registration failed: ${messages}`);
-        } else if (errorData.message) {
-          setError(errorData.message);
-        } else {
-          setError('Invalid registration data. Please check your email and password.');
-        }
-      } else if (err.response?.status === 409) {
-        setError('An account with this email already exists. Please use a different email or try logging in.');
-      } else if (err.response?.status === 500) {
-        setError('Server error. Please try again later.');
-      } else if (err.code === 'NETWORK_ERROR' || !err.response) {
-        setError('Network error. Please check your connection and try again.');
-      } else {
-        setError('Registration failed. Please try again.');
-      }
+      console.error('Registration validation error:', err);
+      setError('An error occurred. Please try again.');
     }
   };
 
   const getProgressPercentage = () => {
     switch (registrationStep) {
       case 'form': return 0;
-      case 'registering': return 50;
-      case 'strava-auth': return 75;
+      case 'validating': return 33;
+      case 'strava-redirect': return 66;
       default: return 0;
     }
   };
@@ -111,8 +140,8 @@ const Register: React.FC = () => {
   const getStepDescription = () => {
     switch (registrationStep) {
       case 'form': return 'Enter your details';
-      case 'registering': return 'Creating your account...';
-      case 'strava-auth': return 'Connecting to Strava...';
+      case 'validating': return 'Validating information...';
+      case 'strava-redirect': return 'Connecting to Strava...';
       default: return '';
     }
   };
@@ -122,6 +151,9 @@ const Register: React.FC = () => {
       <Container>
         <FormCard style={{ marginTop: '50px', textAlign: 'center' }}>
           <Heading size="md">Create Your Account</Heading>
+          <Text size="sm" color="secondary" style={{ marginBottom: '20px' }}>
+            Your account will be created after connecting with Strava
+          </Text>
           
           {/* Progress indicator */}
           {registrationStep !== 'form' && (
@@ -206,10 +238,10 @@ const Register: React.FC = () => {
                   }}
                 >
                   {isLoading ? (
-                    'Creating Account...'
+                    'Processing...'
                   ) : (
                     <>
-                      Register & Connect with 
+                      Continue with 
                       <span style={{ 
                         fontWeight: '700',
                         letterSpacing: '0.5px'
@@ -220,6 +252,11 @@ const Register: React.FC = () => {
                   )}
                 </LoadingButton>
               </FormGroup>
+
+              <Text size="sm" color="secondary" style={{ marginTop: '16px' }}>
+                By continuing, you'll be redirected to Strava to authorize DoubleDash.
+                Your account will only be created after successful authorization.
+              </Text>
             </form>
           )}
 
@@ -228,8 +265,8 @@ const Register: React.FC = () => {
               <FlexContainer direction="column" gap="md" align="center">
                 <LoadingSpinner />
                 <Text size="sm" color="secondary">
-                  {registrationStep === 'registering' && 'Setting up your account...'}
-                  {registrationStep === 'strava-auth' && 'Redirecting to Strava for authorization...'}
+                  {registrationStep === 'validating' && 'Validating your information...'}
+                  {registrationStep === 'strava-redirect' && 'Redirecting to Strava for authorization...'}
                 </Text>
               </FlexContainer>
             </FormGroup>

@@ -13,6 +13,8 @@ router.use(authLimiter);
 // Public routes
 router.post('/register', validate(registerSchema), authController.register);
 router.post('/login', validate(loginSchema), authController.login);
+router.post('/check-email', authController.checkEmail);
+router.post('/register-with-strava', authController.registerWithStrava);
 
 // Protected routes
 router.post('/logout', authMiddleware, authController.logout);

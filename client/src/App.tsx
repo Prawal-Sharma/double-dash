@@ -6,6 +6,7 @@ import EnhancedDashboard from './components/EnhancedDashboard';
 import Activities from './components/Activities';
 import Analytics from './components/Analytics';
 import StravaAuthFailure from './components/StravaAuthFailure';
+import StravaCallback from './components/StravaCallback';
 import Login from './components/Login';
 import Register from './components/Register';
 import { ActivitiesProvider } from './contexts/ActivitiesContext';
@@ -23,6 +24,7 @@ const App: React.FC = () => {
             <Route path="/activities" element={<Activities />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/auth-failure" element={<StravaAuthFailure />} />
+            <Route path="/strava-callback" element={<StravaCallback />} />
             <Route path="/exchange_token" element={<EnhancedDashboard />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
