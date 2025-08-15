@@ -25,10 +25,35 @@ export const Card = styled.div`
   }
 `;
 
-export const Grid = styled.div<{ columns?: number; gap?: keyof Theme['spacing'] }>`
+export const Grid = styled.div<{ 
+  columns?: number | { xs?: number; sm?: number; md?: number; lg?: number }; 
+  gap?: keyof Theme['spacing'] 
+}>`
   display: grid;
-  grid-template-columns: repeat(${props => props.columns || 'auto-fit'}, minmax(200px, 1fr));
   gap: ${({ theme, gap = 'md' }: { theme: Theme; gap?: keyof Theme['spacing'] }) => theme.spacing[gap]};
+  
+  ${({ columns, theme }: { columns?: number | { xs?: number; sm?: number; md?: number; lg?: number }; theme: Theme }) => {
+    if (typeof columns === 'number') {
+      return `grid-template-columns: repeat(${columns}, 1fr);`;
+    } else if (columns && typeof columns === 'object') {
+      return `
+        grid-template-columns: repeat(${columns.xs || 1}, 1fr);
+        
+        @media (min-width: ${theme.breakpoints.sm}) {
+          grid-template-columns: repeat(${columns.sm || columns.xs || 1}, 1fr);
+        }
+        
+        @media (min-width: ${theme.breakpoints.md}) {
+          grid-template-columns: repeat(${columns.md || columns.sm || columns.xs || 1}, 1fr);
+        }
+        
+        @media (min-width: ${theme.breakpoints.lg}) {
+          grid-template-columns: repeat(${columns.lg || columns.md || columns.sm || columns.xs || 1}, 1fr);
+        }
+      `;
+    }
+    return 'grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));';
+  }}
 `;
 
 export const FlexContainer = styled.div<{ 
@@ -232,7 +257,7 @@ export const ProgressText = styled.div`
 `;
 
 // Badge component
-export const Badge = styled.span<{ variant?: 'primary' | 'success' | 'warning' | 'error' }>`
+export const Badge = styled.span<{ variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'error' }>`
   display: inline-flex;
   align-items: center;
   padding: ${({ theme }: { theme: Theme }) => theme.spacing.xs} ${({ theme }: { theme: Theme }) => theme.spacing.sm};
@@ -243,6 +268,7 @@ export const Badge = styled.span<{ variant?: 'primary' | 'success' | 'warning' |
   
   ${({ theme, variant = 'primary' }: { theme: Theme; variant?: string }) => {
     const color = variant === 'primary' ? theme.colors.primary :
+                 variant === 'secondary' ? theme.colors.text.secondary :
                  variant === 'success' ? theme.colors.success :
                  variant === 'warning' ? theme.colors.warning :
                  variant === 'error' ? theme.colors.error :

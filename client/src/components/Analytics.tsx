@@ -43,6 +43,10 @@ import {
 } from '../styles/components';
 import styled from 'styled-components';
 import { format, startOfWeek, parseISO } from 'date-fns';
+import ElevationProfileChart from './charts/ElevationProfileChart';
+import CadenceAnalysisChart from './charts/CadenceAnalysisChart';
+import PRTimelineChart from './charts/PRTimelineChart';
+import TrainingLoadChart from './charts/TrainingLoadChart';
 
 // Styled Components
 const AnalyticsHeader = styled.div`
@@ -212,6 +216,16 @@ interface AnalyticsEnhancedData {
     period: string;
     count: number;
   }>;
+  timeOfDayStats?: Record<string, number>;
+  consistencyMetrics?: {
+    consistencyScore: number;
+    currentStreak: number;
+    longestStreak: number;
+  };
+  paceProgression?: Array<{
+    date: string;
+    pace: number;
+  }>;
 }
 
 const Analytics: React.FC = () => {
@@ -221,6 +235,7 @@ const Analytics: React.FC = () => {
   
   const [analytics, setAnalytics] = useState<AnalyticsEnhancedData | null>(null);
   const [timeRange, setTimeRange] = useState<'all' | '30d' | '90d' | '1y'>('1y');
+  const [filteredActivities, setFilteredActivities] = useState<Activity[]>([]);
   const [weeklyGoal, setWeeklyGoal] = useState(parseFloat(localStorage.getItem('weeklyMileGoal') || '20'));
   const [monthlyGoal, setMonthlyGoal] = useState(parseFloat(localStorage.getItem('monthlyMileGoal') || '80'));
   const [yearlyGoal, setYearlyGoal] = useState(parseFloat(localStorage.getItem('yearlyMileGoal') || '1000'));
@@ -258,6 +273,7 @@ const Analytics: React.FC = () => {
 
   const calculateEnhancedAnalytics = () => {
     let filtered = filterActivitiesByTimeRange([...activities]);
+    setFilteredActivities(filtered);
 
     if (filtered.length === 0) {
       setAnalytics(null);
@@ -653,7 +669,7 @@ const Analytics: React.FC = () => {
         </FilterContainer>
 
         {/* Key Metrics */}
-        <Grid columns={4} gap="lg" style={{ marginBottom: '32px' }}>
+        <Grid columns={{ xs: 2, sm: 2, md: 4 }} gap="lg" style={{ marginBottom: '32px' }}>
           <StatsCard>
             <StatNumber>{analytics.totalActivities}</StatNumber>
             <StatDescription>Total Runs</StatDescription>
@@ -713,7 +729,7 @@ const Analytics: React.FC = () => {
             <Button onClick={saveGoals} size="sm">Save Goals</Button>
           </GoalInput>
 
-          <Grid columns={3} gap="md" style={{ marginTop: '24px' }}>
+          <Grid columns={{ xs: 1, sm: 2, md: 3 }} gap="md" style={{ marginTop: '24px' }}>
             <div>
               <Text size="sm" color="secondary" style={{ marginBottom: '8px' }}>
                 This Week: {currentWeekMiles.toFixed(1)} / {weeklyGoal} miles
@@ -747,7 +763,7 @@ const Analytics: React.FC = () => {
         </GoalSection>
 
         {/* Consistency Metrics */}
-        <Grid columns={3} gap="lg" style={{ marginBottom: '32px' }}>
+        <Grid columns={{ xs: 1, sm: 2, md: 3 }} gap="lg" style={{ marginBottom: '32px' }}>
           <InsightCard>
             <Heading size="sm" style={{ marginBottom: '8px' }}>🔥 Current Streak</Heading>
             <Text size="xxl" weight="bold" style={{ color: theme.colors.primary }}>
@@ -809,7 +825,7 @@ const Analytics: React.FC = () => {
         {/* Personal Records */}
         <div style={{ marginBottom: '32px' }}>
           <Heading size="md" style={{ marginBottom: '16px' }}>Personal Records</Heading>
-          <Grid columns={3} gap="lg">
+          <Grid columns={{ xs: 1, sm: 2, md: 3 }} gap="lg">
             {analytics.personalRecords.fastest5k && (
               <PRCard>
                 <Text size="sm" style={{ marginBottom: '8px', opacity: 0.9 }}>5K</Text>
@@ -844,7 +860,7 @@ const Analytics: React.FC = () => {
         </div>
 
         {/* Charts Grid */}
-        <Grid columns={2} gap="lg" style={{ marginBottom: '32px' }}>
+        <Grid columns={{ xs: 1, sm: 1, md: 2 }} gap="lg" style={{ marginBottom: '32px' }}>
           {/* Weekly Mileage Trend */}
           <ChartContainer>
             <Heading size="sm" style={{ marginBottom: '8px' }}>Weekly Mileage Trend</Heading>
@@ -1054,6 +1070,109 @@ const Analytics: React.FC = () => {
             </ResponsiveContainer>
           </ChartWrapper>
         </ChartContainer>
+
+        {/* New Analytics Charts */}
+        <Grid columns={1} gap="xl" style={{ marginTop: '32px' }}>
+          {/* Training Load Balance */}
+          <TrainingLoadChart activities={filteredActivities} />
+          
+          {/* Elevation Profile */}
+          <ElevationProfileChart activities={filteredActivities} />
+          
+          {/* PR Timeline */}
+          <PRTimelineChart activities={filteredActivities} />
+          
+          {/* Cadence Analysis */}
+          <CadenceAnalysisChart activities={filteredActivities} />
+        </Grid>
+        
+        {/* Data-Driven Insights Panel */}
+        <InsightCard style={{ marginTop: '32px' }}>
+          <Heading size="md" style={{ marginBottom: '16px' }}>
+            📊 Your Personalized Insights
+          </Heading>
+          <Grid columns={{ xs: 1, sm: 1, md: 2 }} gap="md">
+            {analytics.timeOfDayStats && (
+              <div>
+                <Text size="sm" weight="semiBold" style={{ marginBottom: '4px' }}>
+                  ⏰ Best Performance Time
+                </Text>
+                <Text size="sm">
+                  {Object.entries(analytics.timeOfDayStats).reduce((a, b) => a[1] > b[1] ? a : b)[0]}
+                  {' - You tend to run faster during this time'}
+                </Text>
+              </div>
+            )}
+            
+            {analytics.consistencyMetrics && (
+              <div>
+                <Text size="sm" weight="semiBold" style={{ marginBottom: '4px' }}>
+                  📈 Consistency Score
+                </Text>
+                <Text size="sm">
+                  {analytics.consistencyMetrics.consistencyScore.toFixed(0)}% - 
+                  {analytics.consistencyMetrics.consistencyScore > 75 
+                    ? ' Excellent consistency!'
+                    : analytics.consistencyMetrics.consistencyScore > 50
+                    ? ' Good, but room for improvement'
+                    : ' Try to run more regularly'}
+                </Text>
+              </div>
+            )}
+            
+            {analytics.weeklyMileage && analytics.weeklyMileage.length > 4 && (
+              <div>
+                <Text size="sm" weight="semiBold" style={{ marginBottom: '4px' }}>
+                  🎯 Weekly Average
+                </Text>
+                <Text size="sm">
+                  {(analytics.weeklyMileage.reduce((sum, w) => sum + w.miles, 0) / analytics.weeklyMileage.length).toFixed(1)} miles
+                  {' - Your typical weekly volume'}
+                </Text>
+              </div>
+            )}
+            
+            {analytics.paceProgression && analytics.paceProgression.length > 0 && (
+              <div>
+                <Text size="sm" weight="semiBold" style={{ marginBottom: '4px' }}>
+                  🏃 Pace Trend
+                </Text>
+                <Text size="sm">
+                  {analytics.paceProgression[analytics.paceProgression.length - 1].pace < 
+                   analytics.paceProgression[0].pace 
+                    ? '📈 Improving - Getting faster!'
+                    : '📉 Slower recently - Consider rest or easy runs'}
+                </Text>
+              </div>
+            )}
+            
+            {analytics.personalRecords && analytics.personalRecords.longestRun > 0 && (
+              <div>
+                <Text size="sm" weight="semiBold" style={{ marginBottom: '4px' }}>
+                  🏆 Next PR Target
+                </Text>
+                <Text size="sm">
+                  {analytics.personalRecords.fastest5k 
+                    ? `Beat your 5K time of ${formatPRTime(analytics.personalRecords.fastest5k)}`
+                    : 'Complete a 5K run to set a baseline'}
+                </Text>
+              </div>
+            )}
+            
+            {filteredActivities.length > 10 && (
+              <div>
+                <Text size="sm" weight="semiBold" style={{ marginBottom: '4px' }}>
+                  💡 Recovery Insight
+                </Text>
+                <Text size="sm">
+                  {analytics.consistencyMetrics && analytics.consistencyMetrics.currentStreak > 3
+                    ? 'Consider a rest day after long streaks'
+                    : 'Your recovery pattern looks good'}
+                </Text>
+              </div>
+            )}
+          </Grid>
+        </InsightCard>
       </Container>
     </>
   );

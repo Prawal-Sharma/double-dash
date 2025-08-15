@@ -196,43 +196,61 @@ const HomeDashboard: React.FC = () => {
     const monthlyMiles = monthlyActivities.reduce((sum, a) => sum + a.distance, 0) * 0.000621371;
     const yearlyMiles = yearlyActivities.reduce((sum, a) => sum + a.distance, 0) * 0.000621371;
 
-    // Calculate streaks
+    // Calculate streaks - Fixed algorithm
     const sortedActivities = [...activities].sort((a, b) => 
-      new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
+      new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
     );
     
     let currentStreak = 0;
     let longestStreak = 0;
-    let tempStreak = 0;
-    let lastDate: Date | null = null;
-
-    sortedActivities.forEach(activity => {
-      const activityDate = new Date(activity.start_date);
-      activityDate.setHours(0, 0, 0, 0);
+    
+    if (sortedActivities.length > 0) {
+      // Create a set of unique days with activities
+      const runDays = new Set<string>();
+      sortedActivities.forEach(activity => {
+        const date = new Date(activity.start_date);
+        const dateStr = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+        runDays.add(dateStr);
+      });
       
-      if (!lastDate) {
-        tempStreak = 1;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const daysDiff = Math.floor((today.getTime() - activityDate.getTime()) / (24 * 60 * 60 * 1000));
-        if (daysDiff <= 1) {
-          currentStreak = 1;
-        }
-      } else {
-        const daysDiff = Math.floor((lastDate.getTime() - activityDate.getTime()) / (24 * 60 * 60 * 1000));
-        if (daysDiff <= 1) {
+      // Convert to sorted array of dates
+      const uniqueDays = Array.from(runDays).map(dateStr => {
+        const [year, month, day] = dateStr.split('-').map(Number);
+        return new Date(year, month, day);
+      }).sort((a, b) => a.getTime() - b.getTime());
+      
+      // Calculate longest streak
+      let tempStreak = 1;
+      for (let i = 1; i < uniqueDays.length; i++) {
+        const daysDiff = Math.floor((uniqueDays[i].getTime() - uniqueDays[i-1].getTime()) / (24 * 60 * 60 * 1000));
+        if (daysDiff === 1) {
           tempStreak++;
-          if (currentStreak > 0 || daysDiff === 0) {
-            currentStreak = tempStreak;
-          }
         } else {
           longestStreak = Math.max(longestStreak, tempStreak);
           tempStreak = 1;
         }
       }
-      lastDate = activityDate;
-    });
-    longestStreak = Math.max(longestStreak, tempStreak);
+      longestStreak = Math.max(longestStreak, tempStreak);
+      
+      // Calculate current streak
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const lastRunDate = uniqueDays[uniqueDays.length - 1];
+      const daysSinceLastRun = Math.floor((today.getTime() - lastRunDate.getTime()) / (24 * 60 * 60 * 1000));
+      
+      if (daysSinceLastRun <= 1) {
+        // Count backwards from last run to find current streak
+        currentStreak = 1;
+        for (let i = uniqueDays.length - 2; i >= 0; i--) {
+          const daysDiff = Math.floor((uniqueDays[i + 1].getTime() - uniqueDays[i].getTime()) / (24 * 60 * 60 * 1000));
+          if (daysDiff === 1) {
+            currentStreak++;
+          } else {
+            break;
+          }
+        }
+      }
+    }
 
     // Calculate average pace
     const totalSpeed = weeklyActivities.reduce((sum, a) => sum + a.average_speed, 0);
@@ -316,13 +334,13 @@ const HomeDashboard: React.FC = () => {
         {stats.currentStreak > 0 && (
           <FlexContainer justify="center" style={{ marginBottom: '32px' }}>
             <StreakBadge>
-              🔥 {stats.currentStreak} Day Streak!
+              🔥 {stats.currentStreak} {stats.currentStreak === 1 ? 'Day' : 'Days'} Streak!
             </StreakBadge>
           </FlexContainer>
         )}
 
         {/* Key Stats */}
-        <Grid columns={4} gap="lg" style={{ marginBottom: '32px' }}>
+        <Grid columns={{ xs: 2, sm: 2, md: 4 }} gap="lg" style={{ marginBottom: '32px' }}>
           <StatsCard>
             <StatValue>{stats.weeklyMiles.toFixed(1)}</StatValue>
             <StatLabel>Miles This Week</StatLabel>
@@ -381,7 +399,7 @@ const HomeDashboard: React.FC = () => {
           </Link>
         </Grid>
 
-        <Grid columns={2} gap="lg">
+        <Grid columns={{ xs: 1, sm: 1, md: 2 }} gap="lg">
           {/* Recent Activities */}
           <div>
             <FlexContainer justify="space-between" align="center" style={{ marginBottom: '16px' }}>

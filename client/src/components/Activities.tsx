@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
 import { useActivities } from '../contexts/ActivitiesContext';
 import { Activity } from '../types';
+import EnhancedActivityCard from './EnhancedActivityCard';
 import {
   Container,
   Card,
@@ -12,50 +13,11 @@ import {
   Heading,
   Text,
   FlexContainer,
-  Grid,
   LoadingSpinner,
   ErrorMessage,
   Badge,
   Button
 } from '../styles/components';
-
-const ActivityCard = styled(Card)`
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: ${({ theme }) => theme.shadows.lg};
-  }
-`;
-
-const ActivityHeader = styled(FlexContainer)`
-  margin-bottom: ${({ theme }) => theme.spacing.md};
-`;
-
-const ActivityStats = styled(Grid)`
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: ${({ theme }) => theme.spacing.sm};
-  margin-top: ${({ theme }) => theme.spacing.md};
-`;
-
-const StatItem = styled.div`
-  text-align: center;
-  padding: ${({ theme }) => theme.spacing.sm};
-  background: ${({ theme }) => theme.colors.surface};
-  border-radius: ${({ theme }) => theme.borderRadius.sm};
-`;
-
-const StatValue = styled.div`
-  font-size: ${({ theme }) => theme.typography.fontSize.lg};
-  font-weight: ${({ theme }) => theme.typography.fontWeight.bold};
-  color: ${({ theme }) => theme.colors.primary};
-`;
-
-const StatLabel = styled.div`
-  font-size: ${({ theme }) => theme.typography.fontSize.xs};
-  color: ${({ theme }) => theme.colors.text.secondary};
-  margin-top: ${({ theme }) => theme.spacing.xs};
-`;
 
 const SearchContainer = styled(FlexContainer)`
   margin-bottom: ${({ theme }) => theme.spacing.xl};
@@ -73,6 +35,34 @@ const Activities: React.FC = () => {
   const [sortBy, setSortBy] = useState<'date' | 'distance' | 'duration'>('date');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  
+  // Calculate average pace for comparison
+  const averagePace = useMemo(() => {
+    if (activities.length === 0) return 0;
+    const totalSpeed = activities.reduce((sum, a) => sum + a.average_speed, 0);
+    return totalSpeed / activities.length;
+  }, [activities]);
+  
+  // Find personal bests
+  const personalBests = useMemo(() => {
+    const bests = {
+      longestRun: '',
+      fastestPace: '',
+      mostElevation: ''
+    };
+    
+    if (activities.length === 0) return bests;
+    
+    const longest = activities.reduce((max, a) => a.distance > max.distance ? a : max);
+    const fastest = activities.reduce((max, a) => a.average_speed > max.average_speed ? a : max);
+    const mostElev = activities.reduce((max, a) => a.total_elevation_gain > max.total_elevation_gain ? a : max);
+    
+    bests.longestRun = longest.activityId;
+    bests.fastestPace = fastest.activityId;
+    bests.mostElevation = mostElev.activityId;
+    
+    return bests;
+  }, [activities]);
 
   useEffect(() => {
     // Fetch activities using context on mount
@@ -113,37 +103,6 @@ const Activities: React.FC = () => {
     setFilteredActivities(filtered);
   };
 
-  const formatDistance = (meters: number): string => {
-    const miles = meters * 0.000621371;
-    return `${miles.toFixed(2)} mi`;
-  };
-
-  const formatDuration = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-  };
-
-  const formatSpeed = (metersPerSecond: number): string => {
-    const mph = metersPerSecond * 2.237;
-    return `${mph.toFixed(1)} mph`;
-  };
-
-  const formatPace = (metersPerSecond: number): string => {
-    if (metersPerSecond === 0) return '--';
-    const secondsPerMile = 1609.34 / metersPerSecond;
-    const minutes = Math.floor(secondsPerMile / 60);
-    const seconds = Math.floor(secondsPerMile % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}/mi`;
-  };
-
-  const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
 
   if (loading) {
     return (
@@ -254,61 +213,23 @@ const Activities: React.FC = () => {
             <Text>No activities found matching your criteria.</Text>
           </Card>
         ) : (
-          <Grid columns={1} gap="lg" style={{ marginTop: '32px' }}>
-            {currentActivities.map((activity) => (
-              <ActivityCard key={activity.activityId}>
-                <ActivityHeader justify="space-between" align="center">
-                  <div>
-                    <Heading size="sm" style={{ margin: 0, marginBottom: '4px' }}>
-                      {activity.name}
-                    </Heading>
-                    <FlexContainer gap="sm" align="center">
-                      <Badge variant={activity.type === 'Run' ? 'primary' : 'success'}>
-                        {activity.type}
-                      </Badge>
-                      <Text size="sm" color="secondary">
-                        {formatDate(activity.start_date)}
-                      </Text>
-                    </FlexContainer>
-                  </div>
-                </ActivityHeader>
-                
-                <ActivityStats>
-                  <StatItem>
-                    <StatValue>{formatDistance(activity.distance)}</StatValue>
-                    <StatLabel>Distance</StatLabel>
-                  </StatItem>
-                  
-                  <StatItem>
-                    <StatValue>{formatDuration(activity.moving_time)}</StatValue>
-                    <StatLabel>Duration</StatLabel>
-                  </StatItem>
-                  
-                  <StatItem>
-                    <StatValue>{Math.round(activity.total_elevation_gain * 3.28084)} ft</StatValue>
-                    <StatLabel>Elevation</StatLabel>
-                  </StatItem>
-                  
-                  <StatItem>
-                    <StatValue>
-                      {activity.type === 'Run' 
-                        ? formatPace(activity.average_speed)
-                        : formatSpeed(activity.average_speed)
-                      }
-                    </StatValue>
-                    <StatLabel>Avg Pace</StatLabel>
-                  </StatItem>
-                  
-                  {activity.average_heartrate && (
-                    <StatItem>
-                      <StatValue>{Math.round(activity.average_heartrate)} bpm</StatValue>
-                      <StatLabel>Avg HR</StatLabel>
-                    </StatItem>
-                  )}
-                </ActivityStats>
-              </ActivityCard>
-            ))}
-          </Grid>
+          <div style={{ marginTop: '32px' }}>
+            {currentActivities.map((activity) => {
+              const isPersonalBest = 
+                activity.activityId === personalBests.longestRun ||
+                activity.activityId === personalBests.fastestPace ||
+                activity.activityId === personalBests.mostElevation;
+              
+              return (
+                <EnhancedActivityCard
+                  key={activity.activityId}
+                  activity={activity}
+                  averagePace={averagePace}
+                  isPersonalBest={isPersonalBest}
+                />
+              );
+            })}
+          </div>
         )}
         
         {/* Pagination Controls */}
